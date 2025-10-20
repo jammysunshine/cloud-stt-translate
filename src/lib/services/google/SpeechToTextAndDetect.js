@@ -17,7 +17,7 @@ async function detectAndTranscribe(audioData, sampleRate) {
     enableAutomaticPunctuation: true,
     model: 'default',
     // Enable automatic language detection
-    languageCodes: ['en-US', 'es-ES', 'fr-FR', 'de-DE', 'ar-SA', 'hi-IN'], // Add languages you expect
+    languageCodes: ['hi-IN', 'en-US', 'pa-IN', 'ar-SA', 'es-ES', 'fr-FR', 'ml-IN', 'te-IN'], // Add languages you expect
   };
 
   console.log('Sending request to Google STT API with config:', JSON.stringify(config, null, 2));
