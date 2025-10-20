@@ -57,14 +57,32 @@ export default function HomePage() {
           setDetectedLanguages(prev => [...prev, result.language]);
         }
         
-        const [enTranslation, arTranslation] = await Promise.all([
-          getTranslation(result.text, result.language, 'en'),
-          getTranslation(result.text, result.language, 'ar'),
-        ]);
+        const translationPromises = [];
+        if (result.language !== 'en') {
+          translationPromises.push(getTranslation(result.text, result.language, 'en'));
+        } else {
+          setEnglishTranslation(prev => prev + ' ' + result.text); // If source is English, just append it
+        }
+        if (result.language !== 'ar') {
+          translationPromises.push(getTranslation(result.text, result.language, 'ar'));
+        } else {
+          setArabicTranslation(prev => prev + ' ' + result.text); // If source is Arabic, just append it
+        }
 
-        console.log('Setting translation states:', { enTranslation, arTranslation });
-        setEnglishTranslation(prev => prev + ' ' + enTranslation);
-        setArabicTranslation(prev => prev + ' ' + arTranslation);
+        const translations = await Promise.all(translationPromises);
+        let enTranslation = '';
+        let arTranslation = '';
+
+        // Assign translations based on which promises were made
+        let translationIndex = 0;
+        if (result.language !== 'en') {
+          enTranslation = translations[translationIndex++];
+          setEnglishTranslation(prev => prev + ' ' + enTranslation);
+        }
+        if (result.language !== 'ar') {
+          arTranslation = translations[translationIndex++];
+          setArabicTranslation(prev => prev + ' ' + arTranslation);
+        }
       } else {
         console.log('No transcription text received in the result.');
       }

@@ -13,7 +13,7 @@ async function detectAndTranscribe(audioData, sampleRate) {
   const config = {
     encoding: 'WEBM_OPUS',
     sampleRateHertz: parseInt(sampleRate, 10),
-    languageCode: 'en-US', // Will be overridden by auto-detection
+    languageCode: 'hi-IN', // Primary language hint for auto-detection
     enableAutomaticPunctuation: true,
     model: 'default',
     // Enable automatic language detection
