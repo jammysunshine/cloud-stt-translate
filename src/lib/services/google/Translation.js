@@ -1,9 +1,6 @@
-
-// src/lib/services/google/Translation.js
-
-const { TranslationServiceClient } = require('@google-cloud/translate');
-const fs = require('fs');
-const path = require('path');
+import { TranslationServiceClient } from '@google-cloud/translate';
+import fs from 'fs';
+import path from 'path';
 
 const translationClient = new TranslationServiceClient();
 
@@ -30,7 +27,7 @@ function getProjectId() {
   }
 }
 
-async function translateText(text, sourceLang, targetLang) {
+export async function translateText(text, sourceLang, targetLang) {
   console.log(`Translating "${text}" from ${sourceLang} to ${targetLang} with Google Cloud`);
 
   const currentProjectId = getProjectId();
@@ -49,10 +46,6 @@ async function translateText(text, sourceLang, targetLang) {
     return { translatedText };
   } catch (error) {
     console.error('ERROR in Google Translation service:', error);
-    return {
-      translatedText: `Translation Error: ${error.message}`,
-    };
+    throw new Error(`Translation failed: ${error.message}`); // Throw the error
   }
 }
-
-module.exports = { translateText };

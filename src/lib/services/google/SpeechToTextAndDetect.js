@@ -1,11 +1,11 @@
 
 // src/lib/services/google/SpeechToTextAndDetect.js
 
-const { SpeechClient } = require('@google-cloud/speech');
+import { SpeechClient } from '@google-cloud/speech';
 
 const speechClient = new SpeechClient();
 
-async function detectAndTranscribe(audioData, sampleRate) {
+export async function detectAndTranscribe(audioData, sampleRate) {
   const audio = {
     content: audioData.toString('base64'),
   };
@@ -13,7 +13,7 @@ async function detectAndTranscribe(audioData, sampleRate) {
   const config = {
     encoding: 'WEBM_OPUS',
     sampleRateHertz: parseInt(sampleRate, 10),
-    languageCode: 'hi-IN', // Primary language hint for auto-detection
+    languageCode: 'en-US', // Primary language hint for auto-detection
     enableAutomaticPunctuation: true,
     model: 'default',
     // Enable automatic language detection

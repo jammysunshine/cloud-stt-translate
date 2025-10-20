@@ -1,0 +1,180 @@
+
+// websocket-server.js
+import { createServer } from 'http';
+import { WebSocketServer } from 'ws';
+import { SpeechClient } from '@google-cloud/speech';
+import { translateText } from './src/lib/services/google/Translation.js'; // Adjust path
+
+const speechClient = new SpeechClient();
+
+const port = process.env.WS_PORT || 3001; // Use a different port for WebSocket server
+
+const server = createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('WebSocket server is running');
+});
+
+// Initialize WebSocket server
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', (ws) => {
+  console.log('WebSocket client connected (Dedicated Server)');
+
+  let recognizeStream = null;
+
+    ws.on('message', async (message) => {
+      console.log(`[WS Server] Received message. Type: ${typeof message}, Length: ${message.length || message.byteLength}`);
+      // console.log('[WS Server] Raw message:', message);
+
+      let processedMessage = message;
+      if (typeof message !== 'string') {
+        // If message is not a string, it's likely a Buffer (binary data).
+        // Try to convert it to string, assuming it might be the config message.
+        try {
+          const potentialString = message.toString('utf8');
+          // Check if it looks like JSON before assuming it's a string config
+          if (potentialString.startsWith('{') && potentialString.endsWith('}')) {
+            processedMessage = potentialString;
+            console.log('[WS Server] Converted potential config Buffer to string.');
+          }
+        } catch (e) {
+          // Not a valid UTF-8 string, keep as binary
+          console.log('[WS Server] Message is binary, not a valid UTF-8 string.');
+        }
+      }
+
+      if (typeof processedMessage === 'string') {
+        try {
+          const config = JSON.parse(processedMessage);
+          console.log('[WS Server] Received config:', config);
+
+          if (recognizeStream) {
+            console.log('[WS Server] Ending previous recognizeStream before creating new one.');
+            recognizeStream.end();
+          }
+
+          const requestConfig = {
+            encoding: 'WEBM_OPUS',
+            sampleRateHertz: config.sampleRate,
+            languageCode: 'hi-IN', // Default language hint
+            enableAutomaticPunctuation: true,
+            model: 'default',
+            languageCodes: ['hi-IN', 'en-US', 'pa-IN', 'ar-SA', 'es-ES', 'fr-FR', 'ml-IN', 'te-IN'],
+          };
+
+          if (config.languageCode) {
+            requestConfig.languageCode = config.languageCode;
+          }
+
+          const request = {
+            config: requestConfig,
+            interimResults: true, // Get interim results
+            singleUtterance: false, // Expect continuous speech
+          };
+
+          recognizeStream = speechClient
+            .streamingRecognize(request)
+            .on('error', (error) => {
+              console.error('[WS Server] Google STT Stream Error:', error);
+              ws.send(JSON.stringify({ error: error.message }));
+              ws.close(1011, 'Google STT Stream Error'); // Internal error
+            })
+            .on('end', () => {
+              console.log('[WS Server] Google STT Stream Ended.');
+            })
+            .on('close', () => {
+              console.log('[WS Server] Google STT Stream Closed.');
+            })
+            .on('data', async (data) => {
+              const transcription = data.results[0] && data.results[0].alternatives[0]
+                ? data.results[0].alternatives[0].transcript
+                : '';
+              const isFinal = data.results[0] ? data.results[0].isFinal : false;
+              const language = data.results[0] ? data.results[0].languageCode : 'und';
+
+              if (transcription && isFinal) {
+                // Only translate final results
+                const sourceBaseLang = language.split('-')[0];
+                let enTranslation = '';
+                let arTranslation = '';
+
+                const translationPromises = [];
+                if (sourceBaseLang !== 'en') {
+                  translationPromises.push(translateText(transcription, language, 'en'));
+                }
+                if (sourceBaseLang !== 'ar') {
+                  translationPromises.push(translateText(transcription, language, 'ar'));
+                }
+
+                try {
+                  const translations = await Promise.all(translationPromises);
+                  let translationIndex = 0;
+
+                  if (sourceBaseLang !== 'en') {
+                    enTranslation = translations[translationIndex++].translatedText;
+                  } else {
+                    enTranslation = transcription; // If source is English, it's the translation
+                  }
+                  if (sourceBaseLang !== 'ar') {
+                    arTranslation = translations[translationIndex++].translatedText;
+                  } else {
+                    arTranslation = transcription; // If source is Arabic, it's the translation
+                  }
+                } catch (translationError) {
+                  console.error('[WS Server] Error during translation:', translationError);
+                  enTranslation = `Translation Error: ${translationError.message}`;
+                  arTranslation = `Translation Error: ${translationError.message}`;
+                }
+
+                ws.send(JSON.stringify({ transcription, isFinal, language, enTranslation, arTranslation }));
+              } else if (transcription && !isFinal) {
+                // Send interim results without translation
+                ws.send(JSON.stringify({ transcription, isFinal, language }));
+              }
+            });
+
+          // Send acknowledgment back to client
+          ws.send(JSON.stringify({ type: 'config_ack' }));
+
+        } catch (e) {
+          console.error('[WS Server] Error parsing config message:', e.message);
+          ws.close(1008, 'Invalid config message');
+        }
+      } else if (recognizeStream) {
+        // Send audio data to Google STT
+        try {
+          recognizeStream.write(message);
+        } catch (error) {
+          console.error('[WS Server] Error writing to Google STT stream:', error);
+          ws.send(JSON.stringify({ error: 'Error sending audio to STT stream.' }));
+          ws.close(1011, 'STT Stream Write Error');
+        }
+      } else {
+        console.error('[WS Server] Received binary message before config. Closing WebSocket.');
+        ws.close(1008, 'Binary message before config'); // Protocol error
+      }
+    });
+
+  ws.on('close', () => {
+    console.log('WebSocket client disconnected');
+    if (recognizeStream) {
+      console.log('[WS Server] Ending Google STT recognizeStream due to client disconnection.');
+      recognizeStream.end();
+      recognizeStream = null; // Clear the stream reference
+    }
+  });
+
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+    if (recognizeStream) {
+      recognizeStream.end();
+      recognizeStream = null; // Clear the stream reference
+    }
+    ws.close(1011, 'Server error'); // Internal error
+  });
+});
+
+server.listen(port, (err) => {
+  if (err) throw err;
+  console.log(`> WebSocket server listening on ws://localhost:${port}`);
+});

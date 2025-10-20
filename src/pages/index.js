@@ -9,85 +9,45 @@ export default function HomePage() {
   const [englishTranslation, setEnglishTranslation] = useState('');
   const [arabicTranslation, setArabicTranslation] = useState('');
   const [detectedLanguages, setDetectedLanguages] = useState([]);
+  const [interimTranscription, setInterimTranscription] = useState('');
 
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const sampleRateRef = useRef(null);
+  const wsRef = useRef(null); // WebSocket instance
 
-  const getTranslation = async (text, sourceLang, targetLang) => {
-    console.log(`Requesting translation for: "${text}" to ${targetLang}`);
-    try {
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text, sourceLang, targetLang }),
-      });
-      const result = await response.json();
-      console.log(`Received translation result for ${targetLang}:`, result);
-      return result.translatedText;
-    } catch (error) {
-      console.error(`Error translating to ${targetLang}:`, error);
-      return ''; // Return empty string on error
-    }
-  };
-
-  const sendAudioChunk = async (chunk) => {
-    if (chunk.size === 0) return;
-    console.log('Sending audio chunk to backend...');
-    try {
-      const response = await fetch('/api/process-speech', {
-        method: 'POST',
-        body: chunk,
-        headers: {
-          'Content-Type': 'audio/webm',
-          'X-Sample-Rate': sampleRateRef.current,
-        },
-      });
-      const result = await response.json();
-      console.log('Received transcription result from backend:', result);
-
-      if (result.text) {
-        console.log('Transcription received, updating state and requesting translations.');
-        setTranscribedText(prev => prev + ' ' + result.text);
+  // This function will now be called when a transcription is received via WebSocket
+  const processWebSocketMessage = (data) => {
+    if (data.transcription) {
+      if (data.isFinal) {
+        console.log('Final Transcription received, updating state.');
+        setTranscribedText(prev => prev + ' ' + data.transcription);
+        setInterimTranscription(''); // Clear interim when final is received
 
         // Update detected languages
-        if (result.language && !detectedLanguages.includes(result.language)) {
-          setDetectedLanguages(prev => [...prev, result.language]);
-        }
-        
-        const translationPromises = [];
-        if (result.language !== 'en') {
-          translationPromises.push(getTranslation(result.text, result.language, 'en'));
-        } else {
-          setEnglishTranslation(prev => prev + ' ' + result.text); // If source is English, just append it
-        }
-        if (result.language !== 'ar') {
-          translationPromises.push(getTranslation(result.text, result.language, 'ar'));
-        } else {
-          setArabicTranslation(prev => prev + ' ' + result.text); // If source is Arabic, just append it
+        if (data.language) {
+          setDetectedLanguages(prev => {
+            if (!prev.includes(data.language)) {
+              return [...prev, data.language];
+            }
+            return prev;
+          });
         }
 
-        const translations = await Promise.all(translationPromises);
-        let enTranslation = '';
-        let arTranslation = '';
-
-        // Assign translations based on which promises were made
-        let translationIndex = 0;
-        if (result.language !== 'en') {
-          enTranslation = translations[translationIndex++];
-          setEnglishTranslation(prev => prev + ' ' + enTranslation);
+        // Update translations if available
+        if (data.enTranslation) {
+          setEnglishTranslation(prev => prev + ' ' + data.enTranslation);
         }
-        if (result.language !== 'ar') {
-          arTranslation = translations[translationIndex++];
-          setArabicTranslation(prev => prev + ' ' + arTranslation);
+        if (data.arTranslation) {
+          setArabicTranslation(prev => prev + ' ' + data.arTranslation);
         }
       } else {
-        console.log('No transcription text received in the result.');
+        console.log('Interim Transcription received, updating interim state.');
+        setInterimTranscription(data.transcription); // Update interim
       }
-    } catch (error) {
-      console.error('Error sending audio chunk:', error);
+    } else if (data.error) {
+      console.error('WebSocket error from server:', data.error);
+      alert(`Server Error: ${data.error}`);
     }
   };
 
@@ -100,6 +60,9 @@ export default function HomePage() {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
       setIsRecording(false);
     } else {
       // Start recording
@@ -108,6 +71,7 @@ export default function HomePage() {
       setEnglishTranslation('');
       setArabicTranslation('');
       setDetectedLanguages([]);
+      setInterimTranscription('');
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
@@ -118,11 +82,81 @@ export default function HomePage() {
         sampleRateRef.current = settings.sampleRate;
         console.log(`Audio sample rate detected: ${sampleRateRef.current}`);
 
-        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-        mediaRecorderRef.current = mediaRecorder;
+        track.onended = () => {
+          console.log('Audio track ended.');
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
+          }
+        };
 
-        mediaRecorder.ondataavailable = (event) => {
-          sendAudioChunk(event.data);
+        // Initialize WebSocket connection to the dedicated WebSocket server
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.hostname}:3001`);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          console.log('WebSocket connected');
+          const configMessage = JSON.stringify({
+            sampleRate: sampleRateRef.current,
+          });
+          console.log('Sending config message:', configMessage);
+          ws.send(configMessage);
+        };
+
+        ws.onmessage = (event) => {
+          console.log('Received message from WebSocket:', event.data);
+          const data = JSON.parse(event.data);
+          if (data.type === 'config_ack') {
+            console.log('Received config_ack from server. Starting media recorder.');
+            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            mediaRecorderRef.current = mediaRecorder;
+
+            mediaRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+                console.log('Sending audio data chunk, size:', event.data.size);
+                try {
+                  ws.send(event.data);
+                } catch (error) {
+                  console.error('Client-side error sending audio data:', error);
+                  alert(`Client Error: ${error.message}`);
+                  ws.close(1011, 'Client-side audio send error');
+                }
+              }
+            };
+
+            mediaRecorder.start(5000); // Send chunks every 5 seconds
+            setIsRecording(true);
+
+            mediaRecorder.onstop = () => {
+              console.log('MediaRecorder stopped.');
+              // Optionally, you might want to close the WebSocket here if it's not already closed
+              // if (ws.readyState === WebSocket.OPEN) {
+              //   ws.close(1000, 'MediaRecorder stopped');
+              // }
+            };
+
+          } else {
+            try {
+              processWebSocketMessage(data);
+            } catch (error) {
+              console.error('Client-side error processing WebSocket message:', error);
+              alert(`Client Error: ${error.message}`);
+              ws.close(1011, 'Client-side processing error');
+            }
+          }
+        };
+
+        ws.onclose = (event) => {
+          console.log(`WebSocket disconnected. Code: ${event.code}, Reason: ${event.reason}`);
+          if (isRecording) {
+            setIsRecording(false);
+            alert('Recording stopped due to WebSocket disconnection.');
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          alert('WebSocket connection error.');
         };
 
         // Stop and release microphone if the user closes the tab
@@ -130,14 +164,14 @@ export default function HomePage() {
           if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
             mediaRecorderRef.current.stop();
           }
+          if (wsRef.current) {
+            wsRef.current.close();
+          }
         });
 
-        // Send audio chunks every 5 seconds
-        mediaRecorder.start(5000);
-        setIsRecording(true);
       } catch (error) {
-        console.error('Error accessing microphone:', error);
-        alert('Could not access microphone. Please check permissions.');
+        console.error('Error accessing microphone or setting up WebSocket:', error);
+        alert('Could not access microphone or establish connection. Please check permissions and server.');
       }
     }
   };
@@ -156,7 +190,7 @@ export default function HomePage() {
 
       <div style={{ marginTop: '20px' }}>
         <h2>Live Transcription:</h2>
-        <p>{transcribedText || '...'}</p>
+        <p>{transcribedText} <span style={{ color: 'gray' }}>{interimTranscription}</span></p>
       </div>
 
       <div style={{ marginTop: '20px' }}>

@@ -38,3 +38,17 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+
+## Environment Variables
+
+This project requires certain environment variables to be set for the Google Cloud services and the WebSocket server to function correctly.
+
+Create a file named `.env.local` in the root of your project and add the following variables:
+
+```
+GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/google-cloud-keyfile.json"
+WS_PORT=3001
+```
+
+*   **`GOOGLE_APPLICATION_CREDENTIALS`**: This should be the absolute path to your Google Cloud service account key file (JSON format). This file is used by the Google Cloud client libraries to authenticate your application.
+*   **`WS_PORT`**: This specifies the port on which the WebSocket server will listen. The default value is `3001`. Ensure this port is open and not in use by other applications.
