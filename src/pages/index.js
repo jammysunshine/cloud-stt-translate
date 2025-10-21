@@ -93,7 +93,7 @@ export default function HomePage() {
           if (wsRef.current) {
             wsRef.current.close();
           }
-        }, 2000); // 2-second delay
+        }, 5000); // 5-second delay
       }
       setIsRecording(false);
       setHasUserStoppedSession(true); // User explicitly stopped the session
