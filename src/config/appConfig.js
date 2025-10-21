@@ -19,4 +19,4 @@ export const TRANSLATION_LOCATION = 'global';
 
 // Timeouts
 export const CLIENT_STOP_TIMEOUT_MS = 5000; // 5 seconds
-export const SERVER_STT_CLOSE_TIMEOUT_MS = 10000; // 10 seconds
+export const SERVER_STT_CLOSE_TIMEOUT_MS = 30000; // 30 seconds

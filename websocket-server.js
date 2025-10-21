@@ -69,29 +69,28 @@ wss.on('connection', (ws) => {
                     const parsedMessage = JSON.parse(processedMessage);
         
                     if (parsedMessage.type === 'stopRecording') {
-                      logger.info('[WS Server] Received stopRecording message from client.');
+                      logger.info('[WS Server] Received stopRecording message from client.\n');
                       if (recognizeStream) {
                         recognizeStream.end(); // Signal STT API to finalize
-
-                        // Wait for the stream to actually close before closing the WebSocket
-                        recognizeStream.on('close', () => {
-                          logger.info('[WS Server] recognizeStream closed. Closing WebSocket.');
-                          if (ws.readyState === ws.OPEN) {
-                            ws.close(1000, 'Client requested stop'); // Use 1000 for normal closure
-                          }
-                          recognizeStream = null; // Clear the stream reference after closing WebSocket
-                        });
-
-                        // If the stream doesn't close within a reasonable time, force close
-                        setTimeout(() => {
+                        const closeTimeout = setTimeout(() => { // Store timeout ID
                           if (recognizeStream) { // If it's still not null, it means on('close') didn't fire
                             logger.warn('[WS Server] recognizeStream did not close in time. Forcing WebSocket close.');
                             if (ws.readyState === ws.OPEN) {
                               ws.close(4000, 'STT Stream forced close timeout');
                             }
-                            recognizeStream = null;
+                            recognizeStream = null; // Clear reference
                           }
-                        }, SERVER_STT_CLOSE_TIMEOUT_MS); // 10-second timeout for stream close
+                        }, SERVER_STT_CLOSE_TIMEOUT_MS); // 30-second timeout for stream close
+
+                        recognizeStream.on('close', () => {
+                          logger.info('[WS Server] recognizeStream closed. Closing WebSocket.');
+                          clearTimeout(closeTimeout); // Clear the timeout if stream closes cleanly
+                          if (ws.readyState === ws.OPEN) {
+                            ws.close(1000, 'Client requested stop'); // Use 1000 for normal closure
+                          }
+                          recognizeStream = null; // Clear the stream reference after closing WebSocket
+                        });
+                        recognizeStream = null; // Clear reference immediately after ending
                       } else {
                         // If recognizeStream was already null, just close the WebSocket
                         if (ws.readyState === ws.OPEN) {
