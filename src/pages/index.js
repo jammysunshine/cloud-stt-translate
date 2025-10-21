@@ -19,46 +19,47 @@ export default function HomePage() {
   const wsRef = useRef(null); // WebSocket instance
 
   // This function will now be called when a transcription is received via WebSocket
-  const processWebSocketMessage = (data) => {
-    if (data.transcription) {
-      if (data.isFinal) {
-        setTranscribedText(prev => prev + ' ' + data.transcription);
-        setInterimTranscription(''); // Clear interim when final is received
-        setHasFinalTranscription(true); // Set to true when a final transcription is received
-
-        // Update detected languages
-        if (data.language) {
-          setDetectedLanguages(prev => {
-            if (!prev.includes(data.language)) {
-              return [...prev, data.language];
-            }
-            return prev;
-          });
+    const processWebSocketMessage = (data) => {
+      if (data.transcription) {
+        if (data.isFinal) {
+          setTranscribedText(prev => prev + ' ' + data.transcription);
+          setInterimTranscription(''); // Clear interim when final is received
+          setHasFinalTranscription(true); // Set to true when a final transcription is received
+  
+          // Update detected languages
+          if (data.language) {
+            setDetectedLanguages(prev => {
+              if (!prev.includes(data.language)) {
+                return [...prev, data.language];
+              }
+              return prev;
+            });
+          }
+  
+          // Update translations if available
+          if (data.enTranslation) {
+            setEnglishTranslation(prev => prev + ' ' + data.enTranslation);
+          }
+          if (data.arTranslation) {
+            setArabicTranslation(prev => prev + ' ' + data.arTranslation);
+          }
+        } else {
+          setInterimTranscription(data.transcription); // Update interim
+          // Update detected languages for interim results as well
+          if (data.language) {
+            setDetectedLanguages(prev => {
+              if (!prev.includes(data.language)) {
+                return [...prev, data.language];
+              }
+              return prev;
+            });
+          }
         }
-
-        // Update translations if available
-        if (data.enTranslation) {
-          setEnglishTranslation(prev => prev + ' ' + data.enTranslation);
-        }
-        if (data.arTranslation) {
-          setArabicTranslation(prev => prev + ' ' + data.arTranslation);
-        }
-      } else {
-        setInterimTranscription(data.transcription); // Update interim
-        // Update detected languages for interim results as well
-        if (data.language) {
-          setDetectedLanguages(prev => {
-            if (!prev.includes(data.language)) {
-              return [...prev, data.language];
-            }
-            return prev;
-          });
-        }
-    } else if (data.error) {
-      console.error('WebSocket error from server:', data.error);
-      alert(`Server Error: ${data.error}`);
-    }
-  };
+      } else if (data.error) {
+        console.error('WebSocket error from server:', data.error);
+        alert(`Server Error: ${data.error}`);
+      }
+    };
 
   const handleSessionButtonClick = async () => {
     if (isRecording) {
