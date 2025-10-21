@@ -92,6 +92,29 @@ wss.on('connection', (ws) => {
                 const transcription = data.results[0] && data.results[0].alternatives[0]
                   ? data.results[0].alternatives[0].transcript
                   : '';
+              if (transcription && isFinal) {
+                const translationStartTime = process.hrtime.bigint(); // Start timing translation
+
+                const sourceBaseLang = language.split('-')[0];
+                let enTranslation = '';
+                let arTranslation = '';
+
+                const translationPromises = [];
+                if (sourceBaseLang !== 'en') {
+                  translationPromises.push(translateText(transcription, language, 'en'));
+                }
+                if (sourceBaseLang !== 'ar') {
+                  translationPromises.push(translateText(transcription, language, 'ar'));
+                }
+
+                try {
+                  const translations = await Promise.all(translationPromises);
+                  const translationEndTime = process.hrtime.bigint(); // End timing translation
+                  const translationDurationMs = Number(translationEndTime - translationStartTime) / 1_000_000;
+                  console.log(`[WS Server] Translation processing time: ${translationDurationMs.toFixed(2)} ms`);
+
+                  let translationIndex = 0;
+
                   if (sourceBaseLang !== 'en') {
                     enTranslation = translations[translationIndex++].translatedText;
                   } else {
