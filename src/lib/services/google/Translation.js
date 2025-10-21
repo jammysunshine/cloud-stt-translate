@@ -1,6 +1,7 @@
 import { TranslationServiceClient } from '@google-cloud/translate';
 import fs from 'fs';
 import path from 'path';
+import logger from '../../../config/logger.js'; // Import the logger
 
 const translationClient = new TranslationServiceClient();
 
@@ -22,13 +23,13 @@ function getProjectId() {
     }
     return projectId;
   } catch (error) {
-    console.error('Error reading or parsing Google credentials file:', error);
+    logger.error('Error reading or parsing Google credentials file:', error);
     throw new Error('Failed to get Google Cloud Project ID from credentials.');
   }
 }
 
 export async function translateText(text, sourceLang, targetLang) {
-  console.log(`Translating "${text}" from ${sourceLang} to ${targetLang} with Google Cloud`);
+  logger.info(`Translating "${text}" from ${sourceLang} to ${targetLang} with Google Cloud`);
 
   const currentProjectId = getProjectId();
 
@@ -45,7 +46,7 @@ export async function translateText(text, sourceLang, targetLang) {
     const translatedText = response.translations[0].translatedText;
     return { translatedText };
   } catch (error) {
-    console.error('ERROR in Google Translation service:', error);
+    logger.error('ERROR in Google Translation service:', error);
     throw new Error(`Translation failed: ${error.message}`); // Throw the error
   }
 }

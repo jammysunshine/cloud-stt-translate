@@ -2,6 +2,7 @@
 // src/pages/index.js
 
 import { useState, useRef } from 'react';
+import clientLogger from '../utils/logger.js'; // Import the client logger
 
 export default function HomePage() {
   const [isRecording, setIsRecording] = useState(false);
@@ -44,7 +45,7 @@ export default function HomePage() {
   const PING_INTERVAL_MS = 10000; // Send ping every 10 seconds to keep WebSocket alive
 
   const stopRecordingSession = () => {
-    console.log('Stopping recording session...');
+    clientLogger.log('Stopping recording session...');
     isStoppingRef.current = true; // Set flag immediately
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -100,10 +101,10 @@ export default function HomePage() {
         setAvgOverallLatency(calculateAverage(overallLatenciesHistory));
 
         if (data.isFinal) {
-          console.log('Received FINAL transcription from server:', data.transcription);
+          clientLogger.log('Received FINAL transcription from server:', data.transcription);
           setTranscribedText(prev => {
             const newText = prev + ' ' + data.transcription;
-            console.log('Updating transcribedText to:', newText);
+            clientLogger.log('Updating transcribedText to:', newText);
             return newText;
           });
           setInterimTranscription(''); // Clear interim when final is received
@@ -121,18 +122,18 @@ export default function HomePage() {
   
           // Update translations if available
           if (data.enTranslation) {
-            console.log('Received English translation:', data.enTranslation);
+            clientLogger.log('Received English translation:', data.enTranslation);
             setEnglishTranslation(prev => {
               const newTranslation = prev + ' ' + data.enTranslation;
-              console.log('Updating englishTranslation to:', newTranslation);
+              clientLogger.log('Updating englishTranslation to:', newTranslation);
               return newTranslation;
             });
           }
           if (data.arTranslation) {
-            console.log('Received Arabic translation:', data.arTranslation);
+            clientLogger.log('Received Arabic translation:', data.arTranslation);
             setArabicTranslation(prev => {
               const newTranslation = prev + ' ' + data.arTranslation;
-              console.log('Updating arabicTranslation to:', newTranslation);
+              clientLogger.log('Updating arabicTranslation to:', newTranslation);
               return newTranslation;
             });
           }
@@ -149,18 +150,18 @@ export default function HomePage() {
           }
         }
       } else if (data.error) {
-        console.error('WebSocket error from server:', data.error);
-        alert(`Server Error: ${data.error}`);
+        clientLogger.error('WebSocket error from server:', data.error);
+        clientLogger.error(`Server Error: ${data.error}`); // Changed from alert
       }
     };
 
   const handleSessionButtonClick = async () => {
-    console.log('handleSessionButtonClick called. isRecording:', isRecording);
+    clientLogger.log('handleSessionButtonClick called. isRecording:', isRecording);
     if (isRecording) {
       stopRecordingSession(); // Call the new function
     } else {
       // Start recording
-      console.log('Attempting to start session...');
+      clientLogger.log('Attempting to start session...');
       // Reset states for a new session
       setTranscribedText('');
       setEnglishTranslation('');
@@ -171,19 +172,19 @@ export default function HomePage() {
       setHasUserStoppedSession(false); // Reset when starting a new session
       isStoppingRef.current = false; // Reset flag when starting a new session
       try {
-        console.log('Requesting microphone access...');
+        clientLogger.log('Requesting microphone access...');
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
-        console.log('Microphone access granted.');
+        clientLogger.log('Microphone access granted.');
 
         // Get the sample rate from the audio track
         const track = stream.getAudioTracks()[0];
         const settings = track.getSettings();
         sampleRateRef.current = settings.sampleRate;
-        console.log(`Audio sample rate detected: ${sampleRateRef.current}`);
+        clientLogger.log(`Audio sample rate detected: ${sampleRateRef.current}`);
 
         track.onended = () => {
-          console.log('Audio track ended.');
+          clientLogger.log('Audio track ended.');
           if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
             mediaRecorderRef.current.stop();
           }
@@ -192,12 +193,12 @@ export default function HomePage() {
         // Initialize WebSocket connection to the dedicated WebSocket server
         // Use NEXT_PUBLIC_WEBSOCKET_URL environment variable for deployment
         const websocketUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:3001`;
-        console.log(`Connecting to WebSocket at: ${websocketUrl}`);
+        clientLogger.log(`Connecting to WebSocket at: ${websocketUrl}`);
         const ws = new WebSocket(websocketUrl);
         wsRef.current = ws;
 
         ws.onopen = () => {
-          console.log('WebSocket connection opened.');
+          clientLogger.log('WebSocket connection opened.');
           const configMessage = JSON.stringify({
             sampleRate: sampleRateRef.current,
           });
@@ -212,10 +213,10 @@ export default function HomePage() {
         };
 
         ws.onmessage = (event) => {
-          console.log('Received message from WebSocket:', event.data);
+          clientLogger.log('Received message from WebSocket:', event.data);
           const data = JSON.parse(event.data);
           if (data.type === 'config_ack') {
-            console.log('Received config_ack. Starting MediaRecorder.');
+            clientLogger.log('Received config_ack. Starting MediaRecorder.');
             const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
             mediaRecorderRef.current = mediaRecorder;
 
@@ -225,8 +226,8 @@ export default function HomePage() {
                   try {
                     ws.send(event.data);
                   } catch (error) {
-                    console.error('Client-side error sending audio data:', error);
-                    console.error(`Client Error: ${error.message}`); // Changed from alert
+                    clientLogger.error('Client-side error sending audio data:', error);
+                    clientLogger.error(`Client Error: ${error.message}`); // Changed from alert
                     ws.close(4000, 'Client-side audio send error');
                   }
                 }
@@ -238,7 +239,7 @@ export default function HomePage() {
 
             // Set session timeout
             sessionTimeoutRef.current = setTimeout(() => {
-              console.log('Session limit reached. Stopping recording.');
+              clientLogger.log('Session limit reached. Stopping recording.');
               stopRecordingSession(); // Programmatically stop the session
             }, SESSION_LIMIT_SECONDS * 1000); // 30 seconds
 
@@ -246,16 +247,16 @@ export default function HomePage() {
             try {
               processWebSocketMessage(data);
             } catch (error) {
-              console.error('Client-side error processing WebSocket message:', error);
-              console.error(`Client Error: ${error.message}`); // Changed from alert
+              clientLogger.error('Client-side error processing WebSocket message:', error);
+              clientLogger.error(`Client Error: ${error.message}`); // Changed from alert
               ws.close(4000, 'Client-side processing error');
             }
           }
         };
 
         ws.onclose = (event) => {
-          console.log(`WebSocket disconnected. Code: ${event.code}, Reason: ${event.reason}`);
-          console.log('WebSocket close event details:', { code: event.code, reason: event.reason, wasClean: event.wasClean });
+          clientLogger.log(`WebSocket disconnected. Code: ${event.code}, Reason: ${event.reason}`);
+          clientLogger.log('WebSocket close event details:', { code: event.code, reason: event.reason, wasClean: event.wasClean });
           // Clear ping interval on close
           if (pingIntervalRef.current) {
             clearInterval(pingIntervalRef.current);
@@ -263,18 +264,18 @@ export default function HomePage() {
           }
           if (isRecording) {
             setIsRecording(false);
-            console.error('Recording stopped due to WebSocket disconnection.'); // Changed from alert
+            clientLogger.error('Recording stopped due to WebSocket disconnection.'); // Changed from alert
           }
         };
 
         ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
+          clientLogger.error('WebSocket error:', error);
           // Clear ping interval on error
           if (pingIntervalRef.current) {
             clearInterval(pingIntervalRef.current);
             pingIntervalRef.current = null;
           }
-          console.error('WebSocket connection error.'); // Changed from alert
+          clientLogger.error('WebSocket connection error.'); // Changed from alert
         };
 
         // Stop and release microphone if the user closes the tab
@@ -288,8 +289,8 @@ export default function HomePage() {
         });
 
       } catch (error) {
-        console.error('Error accessing microphone or setting up WebSocket:', error);
-        console.error('Could not access microphone or establish connection. Please check permissions and server.'); // Changed from alert
+        clientLogger.error('Error accessing microphone or setting up WebSocket:', error);
+        clientLogger.error('Could not access microphone or establish connection. Please check permissions and server.'); // Changed from alert
       }
     }
   };
