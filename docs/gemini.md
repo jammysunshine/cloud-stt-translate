@@ -15,3 +15,14 @@ For the overall project goals and requirements, refer to `prompt.md`.
 ---
 
 **Commit Message Guidelines:** Commit messages should be simple, concise, and descriptive. Avoid using special characters (e.g., `!`, `@`, `#`, `$`, `%`, `^`, `&`, `*`, `(`, `)`, `[`, `]`, `{`, `}`, `;`, `:`, `'`, `"`, `<`, `>`, `?`, `/`, `\`, `|`, `~`, `` ` ``, `-`, `_`, `=`, `+`) in the commit message itself to ensure compatibility and readability across various Git tools and platforms.
+
+---
+
+**General Optimization Guidelines:** For all future updates and projects, adhere to the following best practices:
+
+*   **Structured Logging:** Implement a dedicated logging solution (e.g., Winston for server, custom logger for client) with configurable levels. Avoid raw `console.log` in production.
+*   **Centralized Configuration:** Externalize all hardcoded values (e.g., API keys, ports, timeouts, language codes, MIME types) into environment variables or a central configuration file.
+*   **User-Friendly Error Handling:** Replace intrusive `alert` or raw `console.error` with non-blocking, user-friendly UI notifications (e.g., toast messages, banners) for client-side errors in production.
+*   **Asynchronous Operations:** Avoid synchronous I/O operations (e.g., `fs.readFileSync`) in main execution paths. Perform heavy or blocking operations asynchronously, ideally during application startup or initialization.
+*   **Resource Management:** Always ensure proper and timely cleanup of all allocated resources (e.g., WebSocket connections, media streams, timers, event listeners) to prevent leaks and unexpected behavior.
+*   **Code Readability & Maintainability:** Extract complex conditional logic into well-named variables or helper functions. Refactor repetitive code into reusable functions or components.
