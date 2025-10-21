@@ -88,6 +88,8 @@ wss.on('connection', (ws) => {
               const language = data.results[0] ? data.results[0].languageCode : 'und';
 
               if (transcription && isFinal) {
+                const translationStartTime = process.hrtime.bigint(); // Start timing translation
+
                 // Only translate final results
                 const sourceBaseLang = language.split('-')[0];
                 let enTranslation = '';
@@ -103,6 +105,10 @@ wss.on('connection', (ws) => {
 
                 try {
                   const translations = await Promise.all(translationPromises);
+                  const translationEndTime = process.hrtime.bigint(); // End timing translation
+                  const translationDurationMs = Number(translationEndTime - translationStartTime) / 1_000_000;
+                  console.log(`[WS Server] Translation processing time: ${translationDurationMs.toFixed(2)} ms`);
+
                   let translationIndex = 0;
 
                   if (sourceBaseLang !== 'en') {
