@@ -70,7 +70,7 @@ wss.on('connection', (ws) => {
                             }
                             recognizeStream = null;
                           }
-                        }, 5000); // 5-second timeout for stream close
+                        }, 10000); // 10-second timeout for stream close
                       } else {
                         // If recognizeStream was already null, just close the WebSocket
                         if (ws.readyState === ws.OPEN) {
