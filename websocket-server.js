@@ -63,10 +63,9 @@ wss.on('connection', (ws) => {
                     }
         
                     const config = parsedMessage;
-        
-                    if (recognizeStream) {
-                      recognizeStream.end();
-                    }  
+
+                    // Only create a new recognizeStream if one doesn't exist
+                    if (!recognizeStream) {
                       const requestConfig = {
                         encoding: 'WEBM_OPUS',
                         sampleRateHertz: config.sampleRate,
@@ -91,7 +90,7 @@ wss.on('connection', (ws) => {
               .on('error', (error) => {
                 console.error('[WS Server] Google STT Stream Error:', error);
                 ws.send(JSON.stringify({ error: error.message }));
-                ws.close(1011, 'Google STT Stream Error'); // Internal error
+                ws.close(4000, 'Google STT Stream Error'); // Internal error
               })
               .on('end', () => {
                 console.log('[WS Server] Google STT Stream Ended.');
@@ -122,6 +121,7 @@ wss.on('connection', (ws) => {
                 const sourceBaseLang = language.split('-')[0];
                 let enTranslation = '';
                 let arTranslation = '';
+                let translationDurationMs = null; // Declare here
 
                 const translationPromises = [];
                 if (sourceBaseLang !== 'en') {
@@ -134,7 +134,7 @@ wss.on('connection', (ws) => {
                 try {
                   const translations = await Promise.all(translationPromises);
                   const translationEndTime = process.hrtime.bigint(); // End timing translation
-                  const translationDurationMs = Number(translationEndTime - translationStartTime) / 1_000_000;
+                  translationDurationMs = Number(translationEndTime - translationStartTime) / 1_000_000;
                   console.log(`[WS Server] Translation processing time: ${translationDurationMs.toFixed(2)} ms`);
 
                   let translationIndex = 0;
@@ -162,15 +162,15 @@ wss.on('connection', (ws) => {
                   language,
                   enTranslation,
                   arTranslation,
-                  sttLatencyMs: currentSttLatencyMs, // Add STT latency
+                  sttLatencyMs: currentSttLatencyMs !== null ? currentSttLatencyMs : 0, // Add STT latency
                   translationDurationMs: translationDurationMs // Add Translation latency
                 }));
               } else if (transcription && !isFinal) {
                 // Send interim results without translation
-                ws.send(JSON.stringify({ transcription, isFinal, language, sttLatencyMs: currentSttLatencyMs })); // Also include STT latency for interim
-              }
+                ws.send(JSON.stringify({ transcription, isFinal, language, sttLatencyMs: currentSttLatencyMs !== null ? currentSttLatencyMs : 0 })); // Also include STT latency for interim
+            }
             });
-
+          } // Closes if (!recognizeStream)
           // Send acknowledgment back to client
           ws.send(JSON.stringify({ type: 'config_ack' }));
 
@@ -182,11 +182,12 @@ wss.on('connection', (ws) => {
         // Send audio data to Google STT
         try {
           lastSttWriteTime = process.hrtime.bigint(); // Record time before writing to STT stream
+          console.log(`[WS Server] Writing audio chunk to STT stream. Length: ${message.length || message.byteLength}`); // Add this log
           recognizeStream.write(message);
         } catch (error) {
           console.error('[WS Server] Error writing to Google STT stream:', error);
           ws.send(JSON.stringify({ error: 'Error sending audio to STT stream.' }));
-          ws.close(1011, 'STT Stream Write Error');
+          ws.close(4000, 'STT Stream Write Error');
         }
       } else {
         console.error('[WS Server] Received binary message before config. Closing WebSocket.');
@@ -209,7 +210,7 @@ wss.on('connection', (ws) => {
       recognizeStream.end();
       recognizeStream = null; // Clear the stream reference
     }
-    ws.close(1011, 'Server error'); // Internal error
+    ws.close(4000, 'Server error'); // Internal error
   });
 });
 
