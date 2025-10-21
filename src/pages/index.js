@@ -16,6 +16,22 @@ export default function HomePage() {
   const [translationLatency, setTranslationLatency] = useState(null);
   const [overallLatency, setOverallLatency] = useState(null);
 
+  const sttLatenciesHistory = useRef([]);
+  const translationLatenciesHistory = useRef([]);
+  const overallLatenciesHistory = useRef([]);
+
+  const [avgSttLatency, setAvgSttLatency] = useState(null);
+  const [avgTranslationLatency, setAvgTranslationLatency] = useState(null);
+  const [avgOverallLatency, setAvgOverallLatency] = useState(null);
+
+  const MAX_HISTORY_SIZE = 20; // Keep history of last 20 latency values
+
+  const calculateAverage = (historyRef) => {
+    if (historyRef.current.length === 0) return null;
+    const sum = historyRef.current.reduce((acc, val) => acc + val, 0);
+    return (sum / historyRef.current.length).toFixed(2);
+  };
+
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const sampleRateRef = useRef(null);
@@ -26,15 +42,33 @@ export default function HomePage() {
       if (data.transcription) {
         // Update latencies if present
         if (data.sttLatencyMs !== undefined) {
-          setSttLatency(data.sttLatencyMs.toFixed(2));
+          const stt = parseFloat(data.sttLatencyMs);
+          setSttLatency(stt.toFixed(2));
+          sttLatenciesHistory.current.push(stt);
+          if (sttLatenciesHistory.current.length > MAX_HISTORY_SIZE) {
+            sttLatenciesHistory.current.shift();
+          }
+          setAvgSttLatency(calculateAverage(sttLatenciesHistory));
         }
         if (data.translationDurationMs !== undefined) {
-          setTranslationLatency(data.translationDurationMs.toFixed(2));
+          const trans = parseFloat(data.translationDurationMs);
+          setTranslationLatency(trans.toFixed(2));
+          translationLatenciesHistory.current.push(trans);
+          if (translationLatenciesHistory.current.length > MAX_HISTORY_SIZE) {
+            translationLatenciesHistory.current.shift();
+          }
+          setAvgTranslationLatency(calculateAverage(translationLatenciesHistory));
         }
 
-        const currentSttLatency = data.sttLatencyMs !== undefined ? data.sttLatencyMs : 0;
-        const currentTranslationLatency = data.translationDurationMs !== undefined ? data.translationDurationMs : 0;
-        setOverallLatency((currentSttLatency + currentTranslationLatency).toFixed(2));
+        const currentSttLatency = data.sttLatencyMs !== undefined ? parseFloat(data.sttLatencyMs) : 0;
+        const currentTranslationLatency = data.translationDurationMs !== undefined ? parseFloat(data.translationDurationMs) : 0;
+        const overall = currentSttLatency + currentTranslationLatency;
+        setOverallLatency(overall.toFixed(2));
+        overallLatenciesHistory.current.push(overall);
+        if (overallLatenciesHistory.current.length > MAX_HISTORY_SIZE) {
+          overallLatenciesHistory.current.shift();
+        }
+        setAvgOverallLatency(calculateAverage(overallLatenciesHistory));
 
         if (data.isFinal) {
           setTranscribedText(prev => prev + ' ' + data.transcription);
@@ -234,9 +268,9 @@ export default function HomePage() {
 
       <div style={{ marginTop: '20px' }}>
         <h2>Latency Statistics:</h2>
-        <p>STT Latency: {sttLatency !== null ? `${sttLatency} ms` : '...'}</p>
-        <p>Translation Latency: {translationLatency !== null ? `${translationLatency} ms` : '...'}</p>
-        <p>Overall Latency (STT + Translation): {overallLatency !== null ? `${overallLatency} ms` : '...'}</p>
+        <p>STT Latency: {sttLatency !== null ? `${sttLatency} ms` : '...'} (Avg: {avgSttLatency !== null ? `${avgSttLatency} ms` : '...'})</p>
+        <p>Translation Latency: {translationLatency !== null ? `${translationLatency} ms` : '...'} (Avg: {avgTranslationLatency !== null ? `${avgTranslationLatency} ms` : '...'})</p>
+        <p>Overall Latency (STT + Translation): {overallLatency !== null ? `${overallLatency} ms` : '...'} (Avg: {avgOverallLatency !== null ? `${avgOverallLatency} ms` : '...'})</p>
       </div>
     </div>
   );
