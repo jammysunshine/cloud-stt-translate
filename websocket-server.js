@@ -1,15 +1,18 @@
+import 'dotenv/config'; // Load environment variables from .env file
 
 // websocket-server.js
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { SpeechClient } from '@google-cloud/speech';
 import { translateText } from './src/lib/services/google/Translation.js'; // Adjust path
+import logger from './src/config/logger.js'; // Import the logger
+import { DEFAULT_WEBSOCKET_PORT, STT_ENCODING, STT_MODEL, STT_ENABLE_AUTOMATIC_PUNCTUATION, STT_LANGUAGE_CODE, STT_LANGUAGE_CODES, SERVER_STT_CLOSE_TIMEOUT_MS } from './src/config/appConfig.js';
 
-console.log('Render PORT environment variable:', process.env.PORT);
+logger.info('Render PORT environment variable:', process.env.PORT);
 
 const speechClient = new SpeechClient();
 
-const port = process.env.PORT || 3001; // Use a different port for WebSocket server
+const port = process.env.PORT || DEFAULT_WEBSOCKET_PORT; // Use a different port for WebSocket server
 
 const server = createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -25,7 +28,7 @@ wss.on('connection', (ws) => {
         let lastSttWriteTime = null; // To measure STT latency
   
       ws.on('message', async (message) => {
-        console.log(`[WS Server] Received message. Type: ${typeof message}, Length: ${message.length || message.byteLength}`);
+        logger.info(`[WS Server] Received message. Type: ${typeof message}, Length: ${message.length || message.byteLength}`);
         // console.log('[WS Server] Raw message:', message);
   
         let processedMessage = message;
@@ -48,13 +51,13 @@ wss.on('connection', (ws) => {
                     const parsedMessage = JSON.parse(processedMessage);
         
                     if (parsedMessage.type === 'stopRecording') {
-                      console.log('[WS Server] Received stopRecording message from client.');
+                      logger.info('[WS Server] Received stopRecording message from client.');
                       if (recognizeStream) {
                         recognizeStream.end(); // Signal STT API to finalize
 
                         // Wait for the stream to actually close before closing the WebSocket
                         recognizeStream.on('close', () => {
-                          console.log('[WS Server] recognizeStream closed. Closing WebSocket.');
+                          logger.info('[WS Server] recognizeStream closed. Closing WebSocket.');
                           if (ws.readyState === ws.OPEN) {
                             ws.close(1000, 'Client requested stop'); // Use 1000 for normal closure
                           }
@@ -64,13 +67,13 @@ wss.on('connection', (ws) => {
                         // If the stream doesn't close within a reasonable time, force close
                         setTimeout(() => {
                           if (recognizeStream) { // If it's still not null, it means on('close') didn't fire
-                            console.warn('[WS Server] recognizeStream did not close in time. Forcing WebSocket close.');
+                            logger.warn('[WS Server] recognizeStream did not close in time. Forcing WebSocket close.');
                             if (ws.readyState === ws.OPEN) {
                               ws.close(4000, 'STT Stream forced close timeout');
                             }
                             recognizeStream = null;
                           }
-                        }, 10000); // 10-second timeout for stream close
+                        }, SERVER_STT_CLOSE_TIMEOUT_MS); // 10-second timeout for stream close
                       } else {
                         // If recognizeStream was already null, just close the WebSocket
                         if (ws.readyState === ws.OPEN) {
@@ -79,7 +82,7 @@ wss.on('connection', (ws) => {
                       }
                       return; // Stop further processing for this message
                     } else if (parsedMessage.type === 'ping') {
-                      console.log('[WS Server] Received ping from client.');
+                      logger.info('[WS Server] Received ping from client.');
                       // Optionally send a pong back: ws.send(JSON.stringify({ type: 'pong' }));
                       return; // Do not process further
                     }
@@ -89,12 +92,12 @@ wss.on('connection', (ws) => {
                     // Only create a new recognizeStream if one doesn't exist
                     if (!recognizeStream) {
                       const requestConfig = {
-                        encoding: 'WEBM_OPUS',
+                        encoding: STT_ENCODING,
                         sampleRateHertz: config.sampleRate,
-                        languageCode: 'hi-IN', // Re-adding default language hint as it's required with languageCodes
-                        enableAutomaticPunctuation: true,
-                        model: 'default',
-                        languageCodes: ['hi-IN', 'en-US', 'es-ES'],
+                        languageCode: STT_LANGUAGE_CODE, // Re-adding default language hint as it's required with languageCodes
+                        enableAutomaticPunctuation: STT_ENABLE_AUTOMATIC_PUNCTUATION,
+                        model: STT_MODEL,
+                        languageCodes: STT_LANGUAGE_CODES,
                       };  
             // The client does not send languageCode, so we remove the conditional block
             // if (config.languageCode) {
@@ -110,22 +113,22 @@ wss.on('connection', (ws) => {
             recognizeStream = speechClient
               .streamingRecognize(request)
               .on('error', (error) => {
-                console.error('[WS Server] Google STT Stream Error:', error);
+                logger.error('[WS Server] Google STT Stream Error:', error);
                 ws.send(JSON.stringify({ error: error.message }));
                 ws.close(4000, 'Google STT Stream Error'); // Internal error
               })
               .on('end', () => {
-                console.log('[WS Server] Google STT Stream Ended.');
+                logger.info('[WS Server] Google STT Stream Ended.');
               })
               .on('close', () => {
-                console.log('[WS Server] Google STT Stream Closed.');
+                logger.info('[WS Server] Google STT Stream Closed.');
               })
               .on('data', async (data) => {
               const sttResponseTime = process.hrtime.bigint();
               let currentSttLatencyMs = null; // Declare here
               if (lastSttWriteTime) {
                 currentSttLatencyMs = Number(sttResponseTime - lastSttWriteTime) / 1_000_000;
-                console.log(`[WS Server] STT processing latency: ${currentSttLatencyMs.toFixed(2)} ms`);
+                logger.info(`[WS Server] STT processing latency: ${currentSttLatencyMs.toFixed(2)} ms`);
                 lastSttWriteTime = null; // Reset after measurement
               }
   
@@ -135,7 +138,7 @@ wss.on('connection', (ws) => {
                 const isFinal = data.results[0] ? data.results[0].isFinal : false;
                 const language = data.results[0] ? data.results[0].languageCode : 'und';
                 if (isFinal) {
-                  console.log('[WS Server] Received FINAL transcription.');
+                  logger.info('[WS Server] Received FINAL transcription.');
                 }
               if (transcription && isFinal) {
                 const translationStartTime = process.hrtime.bigint(); // Start timing translation
@@ -157,7 +160,7 @@ wss.on('connection', (ws) => {
                   const translations = await Promise.all(translationPromises);
                   const translationEndTime = process.hrtime.bigint(); // End timing translation
                   translationDurationMs = Number(translationEndTime - translationStartTime) / 1_000_000;
-                  console.log(`[WS Server] Translation processing time: ${translationDurationMs.toFixed(2)} ms`);
+                  logger.info(`[WS Server] Translation processing time: ${translationDurationMs.toFixed(2)} ms`);
 
                   let translationIndex = 0;
 
@@ -172,7 +175,7 @@ wss.on('connection', (ws) => {
                     arTranslation = transcription; // If source is Arabic, it's the translation
                   }
                 } catch (translationError) {
-                  console.error('[WS Server] Error during translation:', translationError);
+                  logger.error('[WS Server] Error during translation:', translationError);
                   enTranslation = `Translation Error: ${translationError.message}`;
                   arTranslation = `Translation Error: ${translationError.message}`;
                 }
@@ -197,37 +200,37 @@ wss.on('connection', (ws) => {
           ws.send(JSON.stringify({ type: 'config_ack' }));
 
         } catch (e) {
-          console.error('[WS Server] Error parsing config message:', e.message);
+          logger.error('[WS Server] Error parsing config message:', e.message);
           ws.close(1008, 'Invalid config message');
         }
       } else if (recognizeStream) {
         // Send audio data to Google STT
         try {
           lastSttWriteTime = process.hrtime.bigint(); // Record time before writing to STT stream
-          console.log(`[WS Server] Writing audio chunk to STT stream. Length: ${message.length || message.byteLength}`); // Add this log
+          logger.info(`[WS Server] Writing audio chunk to STT stream. Length: ${message.length || message.byteLength}`); // Add this log
           recognizeStream.write(message);
         } catch (error) {
-          console.error('[WS Server] Error writing to Google STT stream:', error);
+          logger.error('[WS Server] Error writing to Google STT stream:', error);
           ws.send(JSON.stringify({ error: 'Error sending audio to STT stream.' }));
           ws.close(4000, 'STT Stream Write Error');
         }
       } else {
-        console.error('[WS Server] Received binary message before config. Closing WebSocket.');
+        logger.error('[WS Server] Received binary message before config. Closing WebSocket.');
         ws.close(1008, 'Binary message before config'); // Protocol error
       }
     });
 
   ws.on('close', () => {
-    console.log('WebSocket client disconnected');
+    logger.info('WebSocket client disconnected');
     if (recognizeStream) {
-      console.log('[WS Server] Ending Google STT recognizeStream due to client disconnection.');
+      logger.info('[WS Server] Ending Google STT recognizeStream due to client disconnection.');
       recognizeStream.end();
       recognizeStream = null; // Clear the stream reference
     }
   });
 
   ws.on('error', (error) => {
-    console.error('WebSocket error:', error);
+    logger.error('WebSocket error:', error);
     if (recognizeStream) {
       recognizeStream.end();
       recognizeStream = null; // Clear the stream reference
@@ -238,5 +241,5 @@ wss.on('connection', (ws) => {
 
 server.listen(port, (err) => {
   if (err) throw err;
-  console.log(`> WebSocket server listening on ws://localhost:${port}`);
+  logger.info(`> WebSocket server listening on ws://localhost:${port}`);
 });

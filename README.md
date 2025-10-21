@@ -74,7 +74,14 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
-### 6. Usage
+### 6. Logging
+
+This application uses a structured logging solution for better visibility and management:
+
+*   **Server-side:** The WebSocket server (`websocket-server.js`) uses `winston` for logging. Logs are output to the console with different levels (info, error, warn) based on the `NODE_ENV` environment variable. In production, you can view these logs in your Render dashboard.
+*   **Client-side:** The frontend (`src/pages/index.js`) uses a custom `clientLogger` (`src/utils/logger.js`). Client-side logs (from `clientLogger.log`, `clientLogger.error`, etc.) are **only visible in your browser's developer console when `NODE_ENV` is set to `development`** (which is the default for `npm run dev`). In production builds, these logs are suppressed.
+
+### 7. Usage
 
 *   Click the "Start Session" button to begin recording audio.
 *   Speak into your microphone.
