@@ -1,4 +1,7 @@
 import 'dotenv/config'; // Load environment variables from .env file
+import fs from 'fs'; // Import fs
+import path from 'path'; // Import path
+import os from 'os'; // Import os for temporary directory
 
 // websocket-server.js
 import { createServer } from 'http';
@@ -7,6 +10,21 @@ import { SpeechClient } from '@google-cloud/speech';
 import { translateText } from './src/lib/services/google/Translation.js'; // Adjust path
 import logger from './src/config/logger.js'; // Import the logger
 import { DEFAULT_WEBSOCKET_PORT, STT_ENCODING, STT_MODEL, STT_ENABLE_AUTOMATIC_PUNCTUATION, STT_LANGUAGE_CODE, STT_LANGUAGE_CODES, SERVER_STT_CLOSE_TIMEOUT_MS } from './src/config/appConfig.js';
+
+// Handle GOOGLE_APPLICATION_CREDENTIALS for deployment environments
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+  try {
+    // Create a temporary file to store the credentials
+    const tempCredentialsPath = path.join(os.tmpdir(), 'gcloud-credentials.json');
+    fs.writeFileSync(tempCredentialsPath, Buffer.from(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON, 'base64').toString('utf8'));
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = tempCredentialsPath;
+    logger.info('Google Cloud credentials successfully written to temporary file.');
+  } catch (error) {
+    logger.error('Error writing Google Cloud credentials to temporary file:', error);
+    // Exit or throw error if credentials cannot be set up
+    process.exit(1);
+  }
+}
 
 logger.info('Render PORT environment variable:', process.env.PORT);
 
@@ -140,13 +158,22 @@ wss.on('connection', (ws) => {
                 if (isFinal) {
                   logger.info('[WS Server] Received FINAL transcription.');
                 }
-              if (transcription && isFinal) {
+              // Always include latency data, even if null for interim results
+              const messageToSend = {
+                transcription,
+                isFinal,
+                language,
+                sttLatencyMs: currentSttLatencyMs !== null ? currentSttLatencyMs : 0,
+                translationDurationMs: null // Default to null for interim
+              };
+
+              if (transcription && isFinal) { // Only perform translation and add its results for final transcriptions
                 const translationStartTime = process.hrtime.bigint(); // Start timing translation
 
                 const sourceBaseLang = language.split('-')[0];
-                let enTranslation = '';
-                let arTranslation = '';
-                let translationDurationMs = null; // Declare here
+                let enTranslation = ''; // Declare and initialize here
+                let arTranslation = ''; // Declare and initialize here
+                let translationDurationMs = null;
 
                 const translationPromises = [];
                 if (sourceBaseLang !== 'en') {
@@ -180,20 +207,13 @@ wss.on('connection', (ws) => {
                   arTranslation = `Translation Error: ${translationError.message}`;
                 }
 
-                // Include latencies in the message
-                ws.send(JSON.stringify({
-                  transcription,
-                  isFinal,
-                  language,
-                  enTranslation,
-                  arTranslation,
-                  sttLatencyMs: currentSttLatencyMs !== null ? currentSttLatencyMs : 0, // Add STT latency
-                  translationDurationMs: translationDurationMs // Add Translation latency
-                }));
-              } else if (transcription && !isFinal) {
-                // Send interim results without translation
-                ws.send(JSON.stringify({ transcription, isFinal, language, sttLatencyMs: currentSttLatencyMs !== null ? currentSttLatencyMs : 0 })); // Also include STT latency for interim
-            }
+                // Add translations and actual translation latency to messageToSend for final results
+                messageToSend.enTranslation = enTranslation;
+                messageToSend.arTranslation = arTranslation;
+                messageToSend.translationDurationMs = translationDurationMs;
+              }
+
+              ws.send(JSON.stringify(messageToSend));
             });
           } // Closes if (!recognizeStream)
           // Send acknowledgment back to client

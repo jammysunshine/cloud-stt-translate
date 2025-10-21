@@ -246,7 +246,8 @@ export default function HomePage() {
             // Set session timeout
             sessionTimeoutRef.current = setTimeout(() => {
               clientLogger.log('Session limit reached. Stopping recording.');
-              stopRecordingSession(); // Programmatically stop the session
+              setIsRecording(false); // Immediately update UI
+              stopRecordingSession(); // Then perform other cleanup
             }, SESSION_LIMIT_SECONDS * 1000); // 30 seconds
 
           } else {
