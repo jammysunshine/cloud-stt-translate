@@ -10,6 +10,7 @@ export default function HomePage() {
   const [arabicTranslation, setArabicTranslation] = useState('');
   const [detectedLanguages, setDetectedLanguages] = useState([]);
   const [interimTranscription, setInterimTranscription] = useState('');
+  const [hasFinalTranscription, setHasFinalTranscription] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
@@ -20,9 +21,9 @@ export default function HomePage() {
   const processWebSocketMessage = (data) => {
     if (data.transcription) {
       if (data.isFinal) {
-        console.log('Final Transcription received, updating state.');
         setTranscribedText(prev => prev + ' ' + data.transcription);
         setInterimTranscription(''); // Clear interim when final is received
+        setHasFinalTranscription(true); // Set to true when a final transcription is received
 
         // Update detected languages
         if (data.language) {
@@ -42,7 +43,6 @@ export default function HomePage() {
           setArabicTranslation(prev => prev + ' ' + data.arTranslation);
         }
       } else {
-        console.log('Interim Transcription received, updating interim state.');
         setInterimTranscription(data.transcription); // Update interim
       }
     } else if (data.error) {
@@ -72,6 +72,7 @@ export default function HomePage() {
       setArabicTranslation('');
       setDetectedLanguages([]);
       setInterimTranscription('');
+      setHasFinalTranscription(false);
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
@@ -95,11 +96,9 @@ export default function HomePage() {
         wsRef.current = ws;
 
         ws.onopen = () => {
-          console.log('WebSocket connected');
           const configMessage = JSON.stringify({
             sampleRate: sampleRateRef.current,
           });
-          console.log('Sending config message:', configMessage);
           ws.send(configMessage);
         };
 
@@ -107,13 +106,11 @@ export default function HomePage() {
           console.log('Received message from WebSocket:', event.data);
           const data = JSON.parse(event.data);
           if (data.type === 'config_ack') {
-            console.log('Received config_ack from server. Starting media recorder.');
             const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
             mediaRecorderRef.current = mediaRecorder;
 
             mediaRecorder.ondataavailable = (event) => {
               if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-                console.log('Sending audio data chunk, size:', event.data.size);
                 try {
                   ws.send(event.data);
                 } catch (error) {
@@ -187,6 +184,12 @@ export default function HomePage() {
       <button onClick={handleSessionButtonClick} style={{ padding: '10px 20px', fontSize: '16px' }}>
         {isRecording ? 'Stop Session' : 'Start Session'}
       </button>
+
+      {!isRecording && !hasFinalTranscription && transcribedText === '' && (
+        <p style={{ color: 'orange', marginTop: '10px' }}>
+          Session too short for final translation. Please speak for longer.
+        </p>
+      )}
 
       <div style={{ marginTop: '20px' }}>
         <h2>Detected Languages:</h2>
