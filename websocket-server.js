@@ -92,6 +92,8 @@ wss.on('connection', (ws) => {
                 const transcription = data.results[0] && data.results[0].alternatives[0]
                   ? data.results[0].alternatives[0].transcript
                   : '';
+                const isFinal = data.results[0] ? data.results[0].isFinal : false;
+                const language = data.results[0] ? data.results[0].languageCode : 'und';
               if (transcription && isFinal) {
                 const translationStartTime = process.hrtime.bigint(); // Start timing translation
 
