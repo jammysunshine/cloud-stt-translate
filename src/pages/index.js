@@ -11,6 +11,7 @@ export default function HomePage() {
   const [detectedLanguages, setDetectedLanguages] = useState([]);
   const [interimTranscription, setInterimTranscription] = useState('');
   const [hasFinalTranscription, setHasFinalTranscription] = useState(false);
+  const [hasUserStoppedSession, setHasUserStoppedSession] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
@@ -64,6 +65,7 @@ export default function HomePage() {
         wsRef.current.close();
       }
       setIsRecording(false);
+      setHasUserStoppedSession(true); // User explicitly stopped the session
     } else {
       // Start recording
       // Reset states for a new session
@@ -73,6 +75,7 @@ export default function HomePage() {
       setDetectedLanguages([]);
       setInterimTranscription('');
       setHasFinalTranscription(false);
+      setHasUserStoppedSession(false); // Reset when starting a new session
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
@@ -121,21 +124,8 @@ export default function HomePage() {
               }
             };
 
-            mediaRecorder.start(5000); // Send chunks every 5 seconds
+            mediaRecorder.start(1000); // Send chunks every 1 second
             setIsRecording(true);
-
-            mediaRecorder.onstop = () => {
-              console.log('MediaRecorder stopped. Attempting to restart...');
-              if (isRecording) { // Only restart if the user hasn't explicitly stopped the session
-                // Close the current WebSocket connection to trigger a new config message on reconnect
-                if (ws.readyState === WebSocket.OPEN) {
-                  ws.close(1000, 'MediaRecorder stopped, restarting');
-                }
-                // The handleSessionButtonClick will be called again to restart the session
-                // This will create a new WebSocket and MediaRecorder
-                handleSessionButtonClick();
-              }
-            };
 
           } else {
             try {
@@ -185,7 +175,7 @@ export default function HomePage() {
         {isRecording ? 'Stop Session' : 'Start Session'}
       </button>
 
-      {!isRecording && !hasFinalTranscription && transcribedText === '' && (
+      {!isRecording && !hasFinalTranscription && transcribedText === '' && hasUserStoppedSession && (
         <p style={{ color: 'orange', marginTop: '10px' }}>
           Session too short for final translation. Please speak for longer.
         </p>
