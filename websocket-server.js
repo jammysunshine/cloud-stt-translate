@@ -49,14 +49,14 @@ wss.on('connection', (ws) => {
               recognizeStream.end();
             }
   
-            const requestConfig = {
-              encoding: 'WEBM_OPUS',
-              sampleRateHertz: config.sampleRate,
-              enableAutomaticPunctuation: true,
-              model: 'default',
-              languageCodes: ['hi-IN', 'en-US', 'pa-IN', 'ar-SA', 'es-ES', 'fr-FR', 'ml-IN', 'te-IN'],
-            };
-  
+                      const requestConfig = {
+                        encoding: 'WEBM_OPUS',
+                        sampleRateHertz: config.sampleRate,
+                        languageCode: 'hi-IN', // Re-adding default language hint as it's required with languageCodes
+                        enableAutomaticPunctuation: true,
+                        model: 'default',
+                        languageCodes: ['hi-IN', 'en-US', 'pa-IN', 'ar-SA', 'es-ES', 'fr-FR', 'ml-IN', 'te-IN'],
+                      };  
             // The client does not send languageCode, so we remove the conditional block
             // if (config.languageCode) {
             //   requestConfig.languageCode = config.languageCode;
