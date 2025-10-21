@@ -37,6 +37,9 @@ export default function HomePage() {
   const sampleRateRef = useRef(null);
   const wsRef = useRef(null); // WebSocket instance
   const isStoppingRef = useRef(false); // Flag to prevent sending audio after stopRecording
+  const sessionTimeoutRef = useRef(null); // Ref to store session timeout ID
+
+  const SESSION_LIMIT_SECONDS = 30; // Maximum session duration in seconds
 
   // This function will now be called when a transcription is received via WebSocket
     const processWebSocketMessage = (data) => {
@@ -129,6 +132,11 @@ export default function HomePage() {
   const handleSessionButtonClick = async () => {
     console.log('handleSessionButtonClick called. isRecording:', isRecording);
     if (isRecording) {
+      // Clear session timeout if it exists
+      if (sessionTimeoutRef.current) {
+        clearTimeout(sessionTimeoutRef.current);
+        sessionTimeoutRef.current = null;
+      }
       // Stop recording
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
@@ -218,6 +226,12 @@ export default function HomePage() {
 
             mediaRecorder.start(1000); // Send chunks every 1 second
             setIsRecording(true);
+
+            // Set session timeout
+            sessionTimeoutRef.current = setTimeout(() => {
+              console.log('Session limit reached. Stopping recording.');
+              handleSessionButtonClick(); // Programmatically stop the session
+            }, SESSION_LIMIT_SECONDS * 1000); // 30 seconds
 
           } else {
             try {
