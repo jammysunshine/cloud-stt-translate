@@ -31,11 +31,10 @@ export default function HomePage() {
         if (data.translationDurationMs !== undefined) {
           setTranslationLatency(data.translationDurationMs.toFixed(2));
         }
-        if (data.sttLatencyMs !== undefined && data.translationDurationMs !== undefined) {
-          setOverallLatency((data.sttLatencyMs + data.translationDurationMs).toFixed(2));
-        } else if (data.sttLatencyMs !== undefined) {
-          setOverallLatency(data.sttLatencyMs.toFixed(2)); // Only STT latency if no translation
-        }
+
+        const currentSttLatency = data.sttLatencyMs !== undefined ? data.sttLatencyMs : 0;
+        const currentTranslationLatency = data.translationDurationMs !== undefined ? data.translationDurationMs : 0;
+        setOverallLatency((currentSttLatency + currentTranslationLatency).toFixed(2));
 
         if (data.isFinal) {
           setTranscribedText(prev => prev + ' ' + data.transcription);
@@ -151,7 +150,7 @@ export default function HomePage() {
                 } catch (error) {
                   console.error('Client-side error sending audio data:', error);
                   alert(`Client Error: ${error.message}`);
-                  ws.close(1011, 'Client-side audio send error');
+                  ws.close(4000, 'Client-side audio send error');
                 }
               }
             };
@@ -165,7 +164,7 @@ export default function HomePage() {
             } catch (error) {
               console.error('Client-side error processing WebSocket message:', error);
               alert(`Client Error: ${error.message}`);
-              ws.close(1011, 'Client-side processing error');
+              ws.close(4000, 'Client-side processing error');
             }
           }
         };
