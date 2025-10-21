@@ -112,10 +112,140 @@ export default function HomePage() {
     };
 
   const handleSessionButtonClick = async () => {
-    // ... existing code ...
+    console.log('handleSessionButtonClick called. isRecording:', isRecording);
+    if (isRecording) {
+      // Stop recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (wsRef.current) {
+        isStoppingRef.current = true; // Set flag when stopRecording is sent
+        wsRef.current.send(JSON.stringify({ type: 'stopRecording' }));
+        // Give server a moment to send final results before closing
+        setTimeout(() => {
+          if (wsRef.current) {
+            wsRef.current.close();
+          }
+        }, 5000); // 5-second delay
+      }
+      setIsRecording(false);
+      setHasUserStoppedSession(true); // User explicitly stopped the session
+    } else {
+      // Start recording
+      console.log('Attempting to start session...');
+      // Reset states for a new session
+      setTranscribedText('');
+      setEnglishTranslation('');
+      setArabicTranslation('');
+      setDetectedLanguages([]);
+      setInterimTranscription('');
+      setHasFinalTranscription(false);
+      setHasUserStoppedSession(false); // Reset when starting a new session
+      isStoppingRef.current = false; // Reset flag when starting a new session
+      try {
+        console.log('Requesting microphone access...');
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+        console.log('Microphone access granted.');
+
+        // Get the sample rate from the audio track
+        const track = stream.getAudioTracks()[0];
+        const settings = track.getSettings();
+        sampleRateRef.current = settings.sampleRate;
+        console.log(`Audio sample rate detected: ${sampleRateRef.current}`);
+
+        track.onended = () => {
+          console.log('Audio track ended.');
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
+          }
+        };
+
+        // Initialize WebSocket connection to the dedicated WebSocket server
+        // Use NEXT_PUBLIC_WEBSOCKET_URL environment variable for deployment
+        const websocketUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:3001`;
+        console.log(`Connecting to WebSocket at: ${websocketUrl}`);
+        const ws = new WebSocket(websocketUrl);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          console.log('WebSocket connection opened.');
+          const configMessage = JSON.stringify({
+            sampleRate: sampleRateRef.current,
+          });
+          ws.send(configMessage);
+        };
+
+        ws.onmessage = (event) => {
+          console.log('Received message from WebSocket:', event.data);
+          const data = JSON.parse(event.data);
+          if (data.type === 'config_ack') {
+            console.log('Received config_ack. Starting MediaRecorder.');
+            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            mediaRecorderRef.current = mediaRecorder;
+
+            mediaRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+                if (!isStoppingRef.current) { // Only send if not in stopping phase
+                  try {
+                    ws.send(event.data);
+                  } catch (error) {
+                    console.error('Client-side error sending audio data:', error);
+                    console.error(`Client Error: ${error.message}`); // Changed from alert
+                    ws.close(4000, 'Client-side audio send error');
+                  }
+                }
+              }
+            };
+
+            mediaRecorder.start(1000); // Send chunks every 1 second
+            setIsRecording(true);
+
+          } else {
+            try {
+              processWebSocketMessage(data);
+            } catch (error) {
+              console.error('Client-side error processing WebSocket message:', error);
+              console.error(`Client Error: ${error.message}`); // Changed from alert
+              ws.close(4000, 'Client-side processing error');
+            }
+          }
+        };
+
+        ws.onclose = (event) => {
+          console.log(`WebSocket disconnected. Code: ${event.code}, Reason: ${event.reason}`);
+          if (isRecording) {
+            setIsRecording(false);
+            console.error('Recording stopped due to WebSocket disconnection.'); // Changed from alert
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          console.error('WebSocket connection error.'); // Changed from alert
+        };
+
+        // Stop and release microphone if the user closes the tab
+        window.addEventListener('beforeunload', () => {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
+          }
+          if (wsRef.current) {
+            wsRef.current.close();
+          }
+        });
+
+      } catch (error) {
+        console.error('Error accessing microphone or setting up WebSocket:', error);
+        console.error('Could not access microphone or establish connection. Please check permissions and server.'); // Changed from alert
+      }
+    }
   };
 
-  const shouldShowSessionTooShortMessage = !isRecording && !hasFinalTranscription && transcribedText === '' && hasUserStoppedSession;
+  const shouldShowSessionTooShortMessage = !isRecording && transcribedText === '' && hasUserStoppedSession;
 
   return (
     <div style={{ fontFamily: 'sans-serif', padding: '20px' }}>
