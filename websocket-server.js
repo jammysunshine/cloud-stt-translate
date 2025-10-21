@@ -54,6 +54,7 @@ wss.on('connection', (ws) => {
                       const requestConfig = {
                         encoding: 'WEBM_OPUS',
                         sampleRateHertz: config.sampleRate,
+                        languageCode: 'hi-IN', // Re-adding default language hint as it's required with languageCodes
                         enableAutomaticPunctuation: true,
                         model: 'default',
                         languageCodes: ['hi-IN', 'en-US', 'es-ES'],
