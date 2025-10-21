@@ -8,4 +8,4 @@ For the overall project goals and requirements, refer to `prompt.md`.
 
 **Important Note:** This `gemini.md` file, along with `README.md` and `Prompt.md`, must be reviewed and updated automatically after any significant change to the project to ensure all documentation remains current and accurate.
 
-**Code Maintenance:** Regularly check for and remove unused code (imports, variables, functions, dead code) to maintain a clean and efficient codebase. This should be done frequently and automatically if possible.
+**Code Maintenance:** Regularly review the code for issues, optimizations, and unused parts (imports, variables, functions, dead code) to maintain a clean, efficient, and high-quality codebase. This should be done frequently and automatically if possible.
