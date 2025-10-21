@@ -45,14 +45,16 @@ export default function HomePage() {
 
   const stopRecordingSession = () => {
     console.log('Stopping recording session...');
+    isStoppingRef.current = true; // Set flag immediately
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stop(); // Stop the recorder
+      // No need to nullify mediaRecorderRef.current here, as ondataavailable will check isStoppingRef
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
     if (wsRef.current) {
-      isStoppingRef.current = true; // Set flag when stopRecording is sent
       wsRef.current.send(JSON.stringify({ type: 'stopRecording' }));
     }
     setIsRecording(false);
