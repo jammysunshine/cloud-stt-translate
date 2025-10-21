@@ -19,98 +19,79 @@ const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws) => {
 
-  let recognizeStream = null;
-
-    ws.on('message', async (message) => {
-      console.log(`[WS Server] Received message. Type: ${typeof message}, Length: ${message.length || message.byteLength}`);
-      // console.log('[WS Server] Raw message:', message);
-
-      let processedMessage = message;
-      if (typeof message !== 'string') {
-        // If message is not a string, it's likely a Buffer (binary data).
-        // Try to convert it to string, assuming it might be the config message.
-        try {
-          const potentialString = message.toString('utf8');
-          // Check if it looks like JSON before assuming it's a string config
-          if (potentialString.startsWith('{') && potentialString.endsWith('}')) {
-            processedMessage = potentialString;
+        let recognizeStream = null;
+        let lastSttWriteTime = null; // To measure STT latency
+  
+      ws.on('message', async (message) => {
+        console.log(`[WS Server] Received message. Type: ${typeof message}, Length: ${message.length || message.byteLength}`);
+        // console.log('[WS Server] Raw message:', message);
+  
+        let processedMessage = message;
+        if (typeof message !== 'string') {
+          // If message is not a string, it's likely a Buffer (binary data).
+          // Try to convert it to string, assuming it might be the config message.
+          try {
+            const potentialString = message.toString('utf8');
+            // Check if it looks like JSON before assuming it's a string config
+            if (potentialString.startsWith('{') && potentialString.endsWith('}')) {
+              processedMessage = potentialString;
+            }
+          } catch (e) {
+            // Not a valid UTF-8 string, keep as binary
           }
-        } catch (e) {
-          // Not a valid UTF-8 string, keep as binary
         }
-      }
-
-      if (typeof processedMessage === 'string') {
-        try {
-          const config = JSON.parse(processedMessage);
-
-          if (recognizeStream) {
-            recognizeStream.end();
-          }
-
-          const requestConfig = {
-            encoding: 'WEBM_OPUS',
-            sampleRateHertz: config.sampleRate,
-            enableAutomaticPunctuation: true,
-            model: 'default',
-            languageCodes: ['hi-IN', 'en-US', 'pa-IN', 'ar-SA', 'es-ES', 'fr-FR', 'ml-IN', 'te-IN'],
-          };
-
-          // The client does not send languageCode, so we remove the conditional block
-          // if (config.languageCode) {
-          //   requestConfig.languageCode = config.languageCode;
-          // }
-
-          const request = {
-            config: requestConfig,
-            interimResults: true, // Get interim results
-            singleUtterance: false, // Expect continuous speech
-          };
-
-          recognizeStream = speechClient
-            .streamingRecognize(request)
-            .on('error', (error) => {
-              console.error('[WS Server] Google STT Stream Error:', error);
-              ws.send(JSON.stringify({ error: error.message }));
-              ws.close(1011, 'Google STT Stream Error'); // Internal error
-            })
-            .on('end', () => {
-              console.log('[WS Server] Google STT Stream Ended.');
-            })
-            .on('close', () => {
-              console.log('[WS Server] Google STT Stream Closed.');
-            })
-            .on('data', async (data) => {
-              const transcription = data.results[0] && data.results[0].alternatives[0]
-                ? data.results[0].alternatives[0].transcript
-                : '';
-              const isFinal = data.results[0] ? data.results[0].isFinal : false;
-              const language = data.results[0] ? data.results[0].languageCode : 'und';
-
-              if (transcription && isFinal) {
-                const translationStartTime = process.hrtime.bigint(); // Start timing translation
-
-                // Only translate final results
-                const sourceBaseLang = language.split('-')[0];
-                let enTranslation = '';
-                let arTranslation = '';
-
-                const translationPromises = [];
-                if (sourceBaseLang !== 'en') {
-                  translationPromises.push(translateText(transcription, language, 'en'));
+  
+        if (typeof processedMessage === 'string') {
+          try {
+            const config = JSON.parse(processedMessage);
+  
+            if (recognizeStream) {
+              recognizeStream.end();
+            }
+  
+            const requestConfig = {
+              encoding: 'WEBM_OPUS',
+              sampleRateHertz: config.sampleRate,
+              enableAutomaticPunctuation: true,
+              model: 'default',
+              languageCodes: ['hi-IN', 'en-US', 'pa-IN', 'ar-SA', 'es-ES', 'fr-FR', 'ml-IN', 'te-IN'],
+            };
+  
+            // The client does not send languageCode, so we remove the conditional block
+            // if (config.languageCode) {
+            //   requestConfig.languageCode = config.languageCode;
+            // }
+  
+            const request = {
+              config: requestConfig,
+              interimResults: true, // Get interim results
+              singleUtterance: false, // Expect continuous speech
+            };
+  
+            recognizeStream = speechClient
+              .streamingRecognize(request)
+              .on('error', (error) => {
+                console.error('[WS Server] Google STT Stream Error:', error);
+                ws.send(JSON.stringify({ error: error.message }));
+                ws.close(1011, 'Google STT Stream Error'); // Internal error
+              })
+              .on('end', () => {
+                console.log('[WS Server] Google STT Stream Ended.');
+              })
+              .on('close', () => {
+                console.log('[WS Server] Google STT Stream Closed.');
+              })
+              .on('data', async (data) => {
+                const sttResponseTime = process.hrtime.bigint();
+                if (lastSttWriteTime) {
+                  const sttLatencyMs = Number(sttResponseTime - lastSttWriteTime) / 1_000_000;
+                  console.log(`[WS Server] STT processing latency: ${sttLatencyMs.toFixed(2)} ms`);
+                  lastSttWriteTime = null; // Reset after measurement
                 }
-                if (sourceBaseLang !== 'ar') {
-                  translationPromises.push(translateText(transcription, language, 'ar'));
-                }
-
-                try {
-                  const translations = await Promise.all(translationPromises);
-                  const translationEndTime = process.hrtime.bigint(); // End timing translation
-                  const translationDurationMs = Number(translationEndTime - translationStartTime) / 1_000_000;
-                  console.log(`[WS Server] Translation processing time: ${translationDurationMs.toFixed(2)} ms`);
-
-                  let translationIndex = 0;
-
+  
+                const transcription = data.results[0] && data.results[0].alternatives[0]
+                  ? data.results[0].alternatives[0].transcript
+                  : '';
                   if (sourceBaseLang !== 'en') {
                     enTranslation = translations[translationIndex++].translatedText;
                   } else {
@@ -144,6 +125,7 @@ wss.on('connection', (ws) => {
       } else if (recognizeStream) {
         // Send audio data to Google STT
         try {
+          lastSttWriteTime = process.hrtime.bigint(); // Record time before writing to STT stream
           recognizeStream.write(message);
         } catch (error) {
           console.error('[WS Server] Error writing to Google STT stream:', error);
