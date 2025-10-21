@@ -18,7 +18,6 @@ const server = createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws) => {
-  console.log('WebSocket client connected (Dedicated Server)');
 
   let recognizeStream = null;
 
@@ -35,36 +34,32 @@ wss.on('connection', (ws) => {
           // Check if it looks like JSON before assuming it's a string config
           if (potentialString.startsWith('{') && potentialString.endsWith('}')) {
             processedMessage = potentialString;
-            console.log('[WS Server] Converted potential config Buffer to string.');
           }
         } catch (e) {
           // Not a valid UTF-8 string, keep as binary
-          console.log('[WS Server] Message is binary, not a valid UTF-8 string.');
         }
       }
 
       if (typeof processedMessage === 'string') {
         try {
           const config = JSON.parse(processedMessage);
-          console.log('[WS Server] Received config:', config);
 
           if (recognizeStream) {
-            console.log('[WS Server] Ending previous recognizeStream before creating new one.');
             recognizeStream.end();
           }
 
           const requestConfig = {
             encoding: 'WEBM_OPUS',
             sampleRateHertz: config.sampleRate,
-            languageCode: 'hi-IN', // Default language hint
             enableAutomaticPunctuation: true,
             model: 'default',
             languageCodes: ['hi-IN', 'en-US', 'pa-IN', 'ar-SA', 'es-ES', 'fr-FR', 'ml-IN', 'te-IN'],
           };
 
-          if (config.languageCode) {
-            requestConfig.languageCode = config.languageCode;
-          }
+          // The client does not send languageCode, so we remove the conditional block
+          // if (config.languageCode) {
+          //   requestConfig.languageCode = config.languageCode;
+          // }
 
           const request = {
             config: requestConfig,
