@@ -41,6 +41,33 @@ export default function HomePage() {
 
   const SESSION_LIMIT_SECONDS = 30; // Maximum session duration in seconds
 
+  const stopRecordingSession = () => {
+    console.log('Stopping recording session...');
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+    if (wsRef.current) {
+      isStoppingRef.current = true; // Set flag when stopRecording is sent
+      wsRef.current.send(JSON.stringify({ type: 'stopRecording' }));
+      // Give server a moment to send final results before closing
+      setTimeout(() => {
+        if (wsRef.current) {
+          wsRef.current.close();
+        }
+      }, 5000); // 5-second delay
+    }
+    setIsRecording(false);
+    setHasUserStoppedSession(true);
+    // Clear session timeout if it exists
+    if (sessionTimeoutRef.current) {
+      clearTimeout(sessionTimeoutRef.current);
+      sessionTimeoutRef.current = null;
+    }
+  };
+
   // This function will now be called when a transcription is received via WebSocket
     const processWebSocketMessage = (data) => {
       if (data.transcription) {
@@ -132,30 +159,7 @@ export default function HomePage() {
   const handleSessionButtonClick = async () => {
     console.log('handleSessionButtonClick called. isRecording:', isRecording);
     if (isRecording) {
-      // Clear session timeout if it exists
-      if (sessionTimeoutRef.current) {
-        clearTimeout(sessionTimeoutRef.current);
-        sessionTimeoutRef.current = null;
-      }
-      // Stop recording
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (wsRef.current) {
-        isStoppingRef.current = true; // Set flag when stopRecording is sent
-        wsRef.current.send(JSON.stringify({ type: 'stopRecording' }));
-        // Give server a moment to send final results before closing
-        setTimeout(() => {
-          if (wsRef.current) {
-            wsRef.current.close();
-          }
-        }, 5000); // 5-second delay
-      }
-      setIsRecording(false);
-      setHasUserStoppedSession(true); // User explicitly stopped the session
+      stopRecordingSession(); // Call the new function
     } else {
       // Start recording
       console.log('Attempting to start session...');
@@ -230,7 +234,7 @@ export default function HomePage() {
             // Set session timeout
             sessionTimeoutRef.current = setTimeout(() => {
               console.log('Session limit reached. Stopping recording.');
-              handleSessionButtonClick(); // Programmatically stop the session
+              stopRecordingSession(); // Programmatically stop the session
             }, SESSION_LIMIT_SECONDS * 1000); // 30 seconds
 
           } else {
