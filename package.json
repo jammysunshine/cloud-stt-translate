@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "ws-dev": "node websocket-server.js"
+    "ws-dev": "node websocket-server.js",
+    "ws-start": "node websocket-server.js"
   },
   "dependencies": {
     "@google-cloud/speech": "^7.2.1",

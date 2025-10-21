@@ -7,7 +7,7 @@ import { translateText } from './src/lib/services/google/Translation.js'; // Adj
 
 const speechClient = new SpeechClient();
 
-const port = process.env.WS_PORT || 3001; // Use a different port for WebSocket server
+const port = process.env.PORT || 3001; // Use a different port for WebSocket server
 
 const server = createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
