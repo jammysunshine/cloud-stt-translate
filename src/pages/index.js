@@ -3,6 +3,7 @@
 
 import { useState, useRef } from 'react';
 import clientLogger from '../utils/logger.js'; // Import the client logger
+import { SESSION_LIMIT_SECONDS, PING_INTERVAL_MS, MAX_HISTORY_SIZE, DEFAULT_WEBSOCKET_PORT, MEDIA_RECORDER_MIME_TYPE, CLIENT_STOP_TIMEOUT_MS } from '../config/appConfig.js';
 
 export default function HomePage() {
   const [isRecording, setIsRecording] = useState(false);
@@ -25,7 +26,8 @@ export default function HomePage() {
   const [avgTranslationLatency, setAvgTranslationLatency] = useState(null);
   const [avgOverallLatency, setAvgOverallLatency] = useState(null);
 
-  const MAX_HISTORY_SIZE = 20; // Keep history of last 20 latency values
+  // Use constants from appConfig.js
+  // const MAX_HISTORY_SIZE = 20; // Keep history of last 20 latency values
 
   const calculateAverage = (historyRef) => {
     if (historyRef.current.length === 0) return null;
@@ -41,8 +43,9 @@ export default function HomePage() {
   const sessionTimeoutRef = useRef(null); // Ref to store session timeout ID
   const pingIntervalRef = useRef(null); // Ref to store ping interval ID
 
-  const SESSION_LIMIT_SECONDS = 30; // Maximum session duration in seconds
-  const PING_INTERVAL_MS = 10000; // Send ping every 10 seconds to keep WebSocket alive
+  // Use constants from appConfig.js
+  // const SESSION_LIMIT_SECONDS = 30; // Maximum session duration in seconds
+  // const PING_INTERVAL_MS = 10000; // Send ping every 10 seconds to keep WebSocket alive
 
   const stopRecordingSession = () => {
     clientLogger.log('Stopping recording session...');
