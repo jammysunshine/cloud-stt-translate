@@ -1,3 +1,4 @@
+import 'dotenv/config'; // Load environment variables from .env file
 
 // websocket-server.js
 import { createServer } from 'http';
@@ -5,12 +6,13 @@ import { WebSocketServer } from 'ws';
 import { SpeechClient } from '@google-cloud/speech';
 import { translateText } from './src/lib/services/google/Translation.js'; // Adjust path
 import logger from './src/config/logger.js'; // Import the logger
+import { DEFAULT_WEBSOCKET_PORT, STT_ENCODING, STT_MODEL, STT_ENABLE_AUTOMATIC_PUNCTUATION, STT_LANGUAGE_CODE, STT_LANGUAGE_CODES, SERVER_STT_CLOSE_TIMEOUT_MS } from './src/config/appConfig.js';
 
 logger.info('Render PORT environment variable:', process.env.PORT);
 
 const speechClient = new SpeechClient();
 
-const port = process.env.PORT || 3001; // Use a different port for WebSocket server
+const port = process.env.PORT || DEFAULT_WEBSOCKET_PORT; // Use a different port for WebSocket server
 
 const server = createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -71,7 +73,7 @@ wss.on('connection', (ws) => {
                             }
                             recognizeStream = null;
                           }
-                        }, 10000); // 10-second timeout for stream close
+                        }, SERVER_STT_CLOSE_TIMEOUT_MS); // 10-second timeout for stream close
                       } else {
                         // If recognizeStream was already null, just close the WebSocket
                         if (ws.readyState === ws.OPEN) {
@@ -90,12 +92,12 @@ wss.on('connection', (ws) => {
                     // Only create a new recognizeStream if one doesn't exist
                     if (!recognizeStream) {
                       const requestConfig = {
-                        encoding: 'WEBM_OPUS',
+                        encoding: STT_ENCODING,
                         sampleRateHertz: config.sampleRate,
-                        languageCode: 'hi-IN', // Re-adding default language hint as it's required with languageCodes
-                        enableAutomaticPunctuation: true,
-                        model: 'default',
-                        languageCodes: ['hi-IN', 'en-US', 'es-ES'],
+                        languageCode: STT_LANGUAGE_CODE, // Re-adding default language hint as it's required with languageCodes
+                        enableAutomaticPunctuation: STT_ENABLE_AUTOMATIC_PUNCTUATION,
+                        model: STT_MODEL,
+                        languageCodes: STT_LANGUAGE_CODES,
                       };  
             // The client does not send languageCode, so we remove the conditional block
             // if (config.languageCode) {

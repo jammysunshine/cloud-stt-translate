@@ -4,6 +4,7 @@
 import { useState, useRef } from 'react';
 import clientLogger from '../utils/logger.js'; // Import the client logger
 import { SESSION_LIMIT_SECONDS, PING_INTERVAL_MS, MAX_HISTORY_SIZE, DEFAULT_WEBSOCKET_PORT, MEDIA_RECORDER_MIME_TYPE, CLIENT_STOP_TIMEOUT_MS } from '../config/appConfig.js';
+import { useToast } from '../components/Toast'; // Import useToast
 
 export default function HomePage() {
   const [isRecording, setIsRecording] = useState(false);
@@ -25,6 +26,8 @@ export default function HomePage() {
   const [avgSttLatency, setAvgSttLatency] = useState(null);
   const [avgTranslationLatency, setAvgTranslationLatency] = useState(null);
   const [avgOverallLatency, setAvgOverallLatency] = useState(null);
+
+  const { addToast } = useToast(); // Initialize useToast
 
   // Use constants from appConfig.js
   // const MAX_HISTORY_SIZE = 20; // Keep history of last 20 latency values
@@ -153,8 +156,8 @@ export default function HomePage() {
           }
         }
       } else if (data.error) {
-        clientLogger.error('WebSocket error from server:', data.error);
-        clientLogger.error(`Server Error: ${data.error}`); // Changed from alert
+        addToast(`WebSocket error from server: ${data.error}`, 'error');
+        addToast(`Server Error: ${data.error}`, 'error');
       }
     };
 
@@ -229,8 +232,8 @@ export default function HomePage() {
                   try {
                     ws.send(event.data);
                   } catch (error) {
-                    clientLogger.error('Client-side error sending audio data:', error);
-                    clientLogger.error(`Client Error: ${error.message}`); // Changed from alert
+                    addToast(`Client-side error sending audio data: ${error.message}`, 'error');
+                    addToast(`Client Error: ${error.message}`, 'error');
                     ws.close(4000, 'Client-side audio send error');
                   }
                 }
@@ -250,8 +253,8 @@ export default function HomePage() {
             try {
               processWebSocketMessage(data);
             } catch (error) {
-              clientLogger.error('Client-side error processing WebSocket message:', error);
-              clientLogger.error(`Client Error: ${error.message}`); // Changed from alert
+              addToast(`Client-side error processing WebSocket message: ${error.message}`, 'error');
+              addToast(`Client Error: ${error.message}`, 'error');
               ws.close(4000, 'Client-side processing error');
             }
           }
@@ -265,20 +268,23 @@ export default function HomePage() {
             clearInterval(pingIntervalRef.current);
             pingIntervalRef.current = null;
           }
-          if (isRecording) {
-            setIsRecording(false);
-            clientLogger.error('Recording stopped due to WebSocket disconnection.'); // Changed from alert
+          setIsRecording(false); // Always set to false on close
+          // Show toast for abnormal closures or if recording was active
+          if (!event.wasClean || event.code !== 1000) { // 1000 is normal closure
+            addToast('WebSocket disconnected unexpectedly. Please try again.', 'error');
+          } else if (isRecording) { // If it was a clean close but recording was active (e.g., user stopped)
+            addToast('Recording session ended.', 'info'); // Or a different message for clean stop
           }
         };
 
         ws.onerror = (error) => {
-          clientLogger.error('WebSocket error:', error);
+          addToast(`WebSocket error: ${error.message}`, 'error');
           // Clear ping interval on error
           if (pingIntervalRef.current) {
             clearInterval(pingIntervalRef.current);
             pingIntervalRef.current = null;
           }
-          clientLogger.error('WebSocket connection error.'); // Changed from alert
+          addToast('WebSocket connection error.', 'error');
         };
 
         // Stop and release microphone if the user closes the tab
@@ -292,8 +298,8 @@ export default function HomePage() {
         });
 
       } catch (error) {
-        clientLogger.error('Error accessing microphone or setting up WebSocket:', error);
-        clientLogger.error('Could not access microphone or establish connection. Please check permissions and server.'); // Changed from alert
+        addToast(`Error accessing microphone or setting up WebSocket: ${error.message}`, 'error');
+        addToast('Could not access microphone or establish connection. Please check permissions and server.', 'error');
       }
     }
   };
