@@ -103,8 +103,9 @@ export default function HomePage() {
         };
 
         // Initialize WebSocket connection to the dedicated WebSocket server
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${protocol}//${window.location.hostname}:3001`);
+        // Use NEXT_PUBLIC_WEBSOCKET_URL environment variable for deployment
+        const websocketUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:3001`;
+        const ws = new WebSocket(websocketUrl);
         wsRef.current = ws;
 
         ws.onopen = () => {
