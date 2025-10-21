@@ -5,6 +5,8 @@ import { WebSocketServer } from 'ws';
 import { SpeechClient } from '@google-cloud/speech';
 import { translateText } from './src/lib/services/google/Translation.js'; // Adjust path
 
+console.log('Render PORT environment variable:', process.env.PORT);
+
 const speechClient = new SpeechClient();
 
 const port = process.env.PORT || 3001; // Use a different port for WebSocket server
