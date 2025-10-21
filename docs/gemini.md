@@ -33,4 +33,5 @@ For the overall project goals and requirements, refer to `prompt.md`.
 **Agent Workflow Mandates:**
 
 *   **Self-Review Before Testing:** Always perform a thorough self-review of all implemented changes, including code, configuration, and documentation, to ensure correctness, completeness, and adherence to project standards *before* asking the user to test.
+*   **Branching Strategy:** All optimizations and significant changes must always be done on a separate branch and never directly on the main branch.
 *   **SSR Compatibility:** When introducing client-side specific APIs or components (e.g., those relying on `window` or `document` objects), ensure they are handled with Server-Side Rendering (SSR) compatibility in mind, typically by dynamically importing or conditionally rendering them only on the client side.
