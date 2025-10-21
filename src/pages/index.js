@@ -38,8 +38,10 @@ export default function HomePage() {
   const wsRef = useRef(null); // WebSocket instance
   const isStoppingRef = useRef(false); // Flag to prevent sending audio after stopRecording
   const sessionTimeoutRef = useRef(null); // Ref to store session timeout ID
+  const pingIntervalRef = useRef(null); // Ref to store ping interval ID
 
   const SESSION_LIMIT_SECONDS = 30; // Maximum session duration in seconds
+  const PING_INTERVAL_MS = 10000; // Send ping every 10 seconds to keep WebSocket alive
 
   const stopRecordingSession = () => {
     console.log('Stopping recording session...');
@@ -204,6 +206,13 @@ export default function HomePage() {
             sampleRate: sampleRateRef.current,
           });
           ws.send(configMessage);
+
+          // Start sending pings to keep the connection alive
+          pingIntervalRef.current = setInterval(() => {
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({ type: 'ping' }));
+            }
+          }, PING_INTERVAL_MS);
         };
 
         ws.onmessage = (event) => {
@@ -250,6 +259,11 @@ export default function HomePage() {
 
         ws.onclose = (event) => {
           console.log(`WebSocket disconnected. Code: ${event.code}, Reason: ${event.reason}`);
+          // Clear ping interval on close
+          if (pingIntervalRef.current) {
+            clearInterval(pingIntervalRef.current);
+            pingIntervalRef.current = null;
+          }
           if (isRecording) {
             setIsRecording(false);
             console.error('Recording stopped due to WebSocket disconnection.'); // Changed from alert
@@ -258,6 +272,11 @@ export default function HomePage() {
 
         ws.onerror = (error) => {
           console.error('WebSocket error:', error);
+          // Clear ping interval on error
+          if (pingIntervalRef.current) {
+            clearInterval(pingIntervalRef.current);
+            pingIntervalRef.current = null;
+          }
           console.error('WebSocket connection error.'); // Changed from alert
         };
 

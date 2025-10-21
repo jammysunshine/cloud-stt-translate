@@ -78,6 +78,10 @@ wss.on('connection', (ws) => {
                         }
                       }
                       return; // Stop further processing for this message
+                    } else if (parsedMessage.type === 'ping') {
+                      console.log('[WS Server] Received ping from client.');
+                      // Optionally send a pong back: ws.send(JSON.stringify({ type: 'pong' }));
+                      return; // Do not process further
                     }
         
                     const config = parsedMessage;
