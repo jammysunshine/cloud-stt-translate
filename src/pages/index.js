@@ -12,6 +12,9 @@ export default function HomePage() {
   const [interimTranscription, setInterimTranscription] = useState('');
   const [hasFinalTranscription, setHasFinalTranscription] = useState(false);
   const [hasUserStoppedSession, setHasUserStoppedSession] = useState(false);
+  const [sttLatency, setSttLatency] = useState(null);
+  const [translationLatency, setTranslationLatency] = useState(null);
+  const [overallLatency, setOverallLatency] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
@@ -21,6 +24,19 @@ export default function HomePage() {
   // This function will now be called when a transcription is received via WebSocket
     const processWebSocketMessage = (data) => {
       if (data.transcription) {
+        // Update latencies if present
+        if (data.sttLatencyMs !== undefined) {
+          setSttLatency(data.sttLatencyMs.toFixed(2));
+        }
+        if (data.translationDurationMs !== undefined) {
+          setTranslationLatency(data.translationDurationMs.toFixed(2));
+        }
+        if (data.sttLatencyMs !== undefined && data.translationDurationMs !== undefined) {
+          setOverallLatency((data.sttLatencyMs + data.translationDurationMs).toFixed(2));
+        } else if (data.sttLatencyMs !== undefined) {
+          setOverallLatency(data.sttLatencyMs.toFixed(2)); // Only STT latency if no translation
+        }
+
         if (data.isFinal) {
           setTranscribedText(prev => prev + ' ' + data.transcription);
           setInterimTranscription(''); // Clear interim when final is received
@@ -215,6 +231,13 @@ export default function HomePage() {
       <div style={{ marginTop: '20px' }}>
         <h2>Arabic Translation:</h2>
         <p>{arabicTranslation || '...'}</p>
+      </div>
+
+      <div style={{ marginTop: '20px' }}>
+        <h2>Latency Statistics:</h2>
+        <p>STT Latency: {sttLatency !== null ? `${sttLatency} ms` : '...'}</p>
+        <p>Translation Latency: {translationLatency !== null ? `${translationLatency} ms` : '...'}</p>
+        <p>Overall Latency (STT + Translation): {overallLatency !== null ? `${overallLatency} ms` : '...'}</p>
       </div>
     </div>
   );

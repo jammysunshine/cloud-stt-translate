@@ -100,12 +100,13 @@ wss.on('connection', (ws) => {
                 console.log('[WS Server] Google STT Stream Closed.');
               })
               .on('data', async (data) => {
-                const sttResponseTime = process.hrtime.bigint();
-                if (lastSttWriteTime) {
-                  const sttLatencyMs = Number(sttResponseTime - lastSttWriteTime) / 1_000_000;
-                  console.log(`[WS Server] STT processing latency: ${sttLatencyMs.toFixed(2)} ms`);
-                  lastSttWriteTime = null; // Reset after measurement
-                }
+              const sttResponseTime = process.hrtime.bigint();
+              let currentSttLatencyMs = null; // Declare here
+              if (lastSttWriteTime) {
+                currentSttLatencyMs = Number(sttResponseTime - lastSttWriteTime) / 1_000_000;
+                console.log(`[WS Server] STT processing latency: ${currentSttLatencyMs.toFixed(2)} ms`);
+                lastSttWriteTime = null; // Reset after measurement
+              }
   
                 const transcription = data.results[0] && data.results[0].alternatives[0]
                   ? data.results[0].alternatives[0].transcript
@@ -154,10 +155,19 @@ wss.on('connection', (ws) => {
                   arTranslation = `Translation Error: ${translationError.message}`;
                 }
 
-                ws.send(JSON.stringify({ transcription, isFinal, language, enTranslation, arTranslation }));
+                // Include latencies in the message
+                ws.send(JSON.stringify({
+                  transcription,
+                  isFinal,
+                  language,
+                  enTranslation,
+                  arTranslation,
+                  sttLatencyMs: currentSttLatencyMs, // Add STT latency
+                  translationDurationMs: translationDurationMs // Add Translation latency
+                }));
               } else if (transcription && !isFinal) {
                 // Send interim results without translation
-                ws.send(JSON.stringify({ transcription, isFinal, language }));
+                ws.send(JSON.stringify({ transcription, isFinal, language, sttLatencyMs: currentSttLatencyMs })); // Also include STT latency for interim
               }
             });
 
