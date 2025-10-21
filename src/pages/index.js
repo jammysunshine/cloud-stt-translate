@@ -72,7 +72,12 @@ export default function HomePage() {
         setAvgOverallLatency(calculateAverage(overallLatenciesHistory));
 
         if (data.isFinal) {
-          setTranscribedText(prev => prev + ' ' + data.transcription);
+          console.log('Received FINAL transcription from server:', data.transcription);
+          setTranscribedText(prev => {
+            const newText = prev + ' ' + data.transcription;
+            console.log('Updating transcribedText to:', newText);
+            return newText;
+          });
           setInterimTranscription(''); // Clear interim when final is received
           setHasFinalTranscription(true); // Set to true when a final transcription is received
   
@@ -88,10 +93,20 @@ export default function HomePage() {
   
           // Update translations if available
           if (data.enTranslation) {
-            setEnglishTranslation(prev => prev + ' ' + data.enTranslation);
+            console.log('Received English translation:', data.enTranslation);
+            setEnglishTranslation(prev => {
+              const newTranslation = prev + ' ' + data.enTranslation;
+              console.log('Updating englishTranslation to:', newTranslation);
+              return newTranslation;
+            });
           }
           if (data.arTranslation) {
-            setArabicTranslation(prev => prev + ' ' + data.arTranslation);
+            console.log('Received Arabic translation:', data.arTranslation);
+            setArabicTranslation(prev => {
+              const newTranslation = prev + ' ' + data.arTranslation;
+              console.log('Updating arabicTranslation to:', newTranslation);
+              return newTranslation;
+            });
           }
         } else {
           setInterimTranscription(data.transcription); // Update interim
