@@ -54,12 +54,6 @@ export default function HomePage() {
     if (wsRef.current) {
       isStoppingRef.current = true; // Set flag when stopRecording is sent
       wsRef.current.send(JSON.stringify({ type: 'stopRecording' }));
-      // Give server a moment to send final results before closing
-      setTimeout(() => {
-        if (wsRef.current) {
-          wsRef.current.close();
-        }
-      }, 5000); // 5-second delay
     }
     setIsRecording(false);
     setHasUserStoppedSession(true);
@@ -259,6 +253,7 @@ export default function HomePage() {
 
         ws.onclose = (event) => {
           console.log(`WebSocket disconnected. Code: ${event.code}, Reason: ${event.reason}`);
+          console.log('WebSocket close event details:', { code: event.code, reason: event.reason, wasClean: event.wasClean });
           // Clear ping interval on close
           if (pingIntervalRef.current) {
             clearInterval(pingIntervalRef.current);
