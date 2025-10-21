@@ -128,11 +128,16 @@ export default function HomePage() {
             setIsRecording(true);
 
             mediaRecorder.onstop = () => {
-              console.log('MediaRecorder stopped.');
-              // Optionally, you might want to close the WebSocket here if it's not already closed
-              // if (ws.readyState === WebSocket.OPEN) {
-              //   ws.close(1000, 'MediaRecorder stopped');
-              // }
+              console.log('MediaRecorder stopped. Attempting to restart...');
+              if (isRecording) { // Only restart if the user hasn't explicitly stopped the session
+                // Close the current WebSocket connection to trigger a new config message on reconnect
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.close(1000, 'MediaRecorder stopped, restarting');
+                }
+                // The handleSessionButtonClick will be called again to restart the session
+                // This will create a new WebSocket and MediaRecorder
+                handleSessionButtonClick();
+              }
             };
 
           } else {
