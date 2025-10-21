@@ -3,7 +3,11 @@
 export const SESSION_LIMIT_SECONDS = 30;
 export const PING_INTERVAL_MS = 10000; // 10 seconds
 export const MAX_HISTORY_SIZE = 20;
-export const DEFAULT_WEBSOCKET_PORT = 3001;
+export const DEFAULT_WEBSOCKET_PORT = process.env.NEXT_PUBLIC_DEFAULT_WEBSOCKET_PORT || 3001;
+
+// For local development, create a .env.local file in the root directory
+// and add environment variables like:
+// NEXT_PUBLIC_DEFAULT_WEBSOCKET_PORT=3001
 export const MEDIA_RECORDER_MIME_TYPE = 'audio/webm';
 
 // Google Cloud STT Configuration

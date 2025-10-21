@@ -5,10 +5,11 @@ interface ToastMessage {
   id: string;
   message: string;
   type: 'success' | 'error' | 'info' | 'warning';
+  duration?: number; // Optional duration in milliseconds
 }
 
 interface ToastContextType {
-  addToast: (message: string, type?: ToastMessage['type']) => void;
+  addToast: (message: string, type?: ToastMessage['type'], duration?: number) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -21,9 +22,9 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setMounted(true); // Set mounted to true once component mounts on client
   }, []);
 
-  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info') => {
+  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info', duration?: number) => {
     const id = Math.random().toString(36).substr(2, 9);
-    setToasts((prevToasts) => [...prevToasts, { id, message, type }]);
+    setToasts((prevToasts) => [...prevToasts, { id, message, type, duration }]);
   }, []);
 
   const removeToast = useCallback((id: string) => {
@@ -49,13 +50,13 @@ interface ToastProps extends ToastMessage {
   onDismiss: () => void;
 }
 
-const Toast: React.FC<ToastProps> = ({ id, message, type, onDismiss }) => {
+const Toast: React.FC<ToastProps> = ({ id, message, type, duration, onDismiss }) => {
   React.useEffect(() => {
     const timer = setTimeout(() => {
       onDismiss();
-    }, 5000); // Dismiss after 5 seconds
+    }, duration || 5000); // Dismiss after specified duration or 5 seconds
     return () => clearTimeout(timer);
-  }, [onDismiss]);
+  }, [onDismiss, duration]);
 
   const typeClasses = {
     success: 'bg-green-500',
