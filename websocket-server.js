@@ -55,7 +55,7 @@ wss.on('connection', (ws) => {
                         languageCode: 'hi-IN', // Re-adding default language hint as it's required with languageCodes
                         enableAutomaticPunctuation: true,
                         model: 'default',
-                        languageCodes: ['hi-IN', 'en-US', 'pa-IN', 'ar-SA', 'es-ES', 'fr-FR', 'ml-IN', 'te-IN'],
+                        languageCodes: ['hi-IN', 'en-US', 'es-ES'],
                       };  
             // The client does not send languageCode, so we remove the conditional block
             // if (config.languageCode) {
@@ -94,6 +94,9 @@ wss.on('connection', (ws) => {
                   : '';
                 const isFinal = data.results[0] ? data.results[0].isFinal : false;
                 const language = data.results[0] ? data.results[0].languageCode : 'und';
+                if (isFinal) {
+                  console.log('[WS Server] Received FINAL transcription.');
+                }
               if (transcription && isFinal) {
                 const translationStartTime = process.hrtime.bigint(); // Start timing translation
 
