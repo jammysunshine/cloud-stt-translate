@@ -83,14 +83,14 @@ wss.on('connection', (ws) => {
                         }, SERVER_STT_CLOSE_TIMEOUT_MS); // 30-second timeout for stream close
 
                         recognizeStream.on('close', () => {
-                          logger.info('[WS Server] recognizeStream closed. Closing WebSocket.');
+                          logger.info('[WS Server] recognizeStream closed. Clearing timeout and closing WebSocket.');
                           clearTimeout(closeTimeout); // Clear the timeout if stream closes cleanly
                           if (ws.readyState === ws.OPEN) {
                             ws.close(1000, 'Client requested stop'); // Use 1000 for normal closure
                           }
                           recognizeStream = null; // Clear the stream reference after closing WebSocket
                         });
-                        recognizeStream = null; // Clear reference immediately after ending
+                        // Do NOT nullify recognizeStream here immediately. Let the 'close' event handle it.
                       } else {
                         // If recognizeStream was already null, just close the WebSocket
                         if (ws.readyState === ws.OPEN) {
@@ -111,17 +111,7 @@ wss.on('connection', (ws) => {
                       const requestConfig = {
                         encoding: STT_ENCODING,
                         sampleRateHertz: config.sampleRate,
-                        languageCode: STT_LANGUAGE_CODE, // Re-adding default language hint as it's required with languageCodes
-                        enableAutomaticPunctuation: STT_ENABLE_AUTOMATIC_PUNCTUATION,
-                        model: STT_MODEL,
-                        languageCodes: STT_LANGUAGE_CODES,
-                      };  
-            // The client does not send languageCode, so we remove the conditional block
-            // if (config.languageCode) {
-            //   requestConfig.languageCode = config.languageCode;
-            // }
-  
-            const request = {
+                        languageCode: config.languageCode || STT_LANGUAGE_CODE, // Use client-provided languageCode or fallback to default
               config: requestConfig,
               interimResults: true, // Get interim results
               singleUtterance: false, // Expect continuous speech
@@ -132,7 +122,10 @@ wss.on('connection', (ws) => {
               .on('error', (error) => {
                 logger.error('[WS Server] Google STT Stream Error:', error);
                 ws.send(JSON.stringify({ error: error.message }));
-                ws.close(4000, 'Google STT Stream Error'); // Internal error
+                // Centralized WebSocket closing for errors
+                if (ws.readyState === ws.OPEN) {
+                  ws.close(4000, `Google STT Stream Error: ${error.message}`);
+                }
               })
               .on('end', () => {
                 logger.info('[WS Server] Google STT Stream Ended.');
@@ -226,12 +219,14 @@ wss.on('connection', (ws) => {
         // Send audio data to Google STT
         try {
           lastSttWriteTime = process.hrtime.bigint(); // Record time before writing to STT stream
-          logger.info(`[WS Server] Writing audio chunk to STT stream. Length: ${message.length || message.byteLength}`); // Add this log
+          logger.debug(`[WS Server] Writing audio chunk to STT stream. Length: ${message.length || message.byteLength}`); // Add this log
           recognizeStream.write(message);
         } catch (error) {
           logger.error('[WS Server] Error writing to Google STT stream:', error);
           ws.send(JSON.stringify({ error: 'Error sending audio to STT stream.' }));
-          ws.close(4000, 'STT Stream Write Error');
+          if (ws.readyState === ws.OPEN) {
+            ws.close(4000, `STT Stream Write Error: ${error.message}`);
+          }
         }
       } else {
         logger.error('[WS Server] Received binary message before config. Closing WebSocket.');
@@ -254,7 +249,9 @@ wss.on('connection', (ws) => {
       recognizeStream.end();
       recognizeStream = null; // Clear the stream reference
     }
-    ws.close(4000, 'Server error'); // Internal error
+    if (ws.readyState === ws.OPEN) {
+      ws.close(4000, `Server error: ${error.message}`); // Internal error
+    }
   });
 });
 
