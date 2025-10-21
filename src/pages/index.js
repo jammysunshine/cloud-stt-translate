@@ -71,7 +71,13 @@ export default function HomePage() {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
       if (wsRef.current) {
-        wsRef.current.close();
+        wsRef.current.send(JSON.stringify({ type: 'stopRecording' }));
+        // Give server a moment to send final results before closing
+        setTimeout(() => {
+          if (wsRef.current) {
+            wsRef.current.close();
+          }
+        }, 2000); // 2-second delay
       }
       setIsRecording(false);
       setHasUserStoppedSession(true); // User explicitly stopped the session

@@ -43,14 +43,30 @@ wss.on('connection', (ws) => {
           }
         }
   
-        if (typeof processedMessage === 'string') {
-          try {
-            const config = JSON.parse(processedMessage);
-  
-            if (recognizeStream) {
-              recognizeStream.end();
-            }
-  
+                if (typeof processedMessage === 'string') {
+                  try {
+                    const parsedMessage = JSON.parse(processedMessage);
+        
+                    if (parsedMessage.type === 'stopRecording') {
+                      console.log('[WS Server] Received stopRecording message from client.');
+                      if (recognizeStream) {
+                        recognizeStream.end(); // Signal STT API to finalize
+                        recognizeStream = null; // Clear the stream reference
+                      }
+                      // Give client a moment to receive final messages before closing server-side
+                      setTimeout(() => {
+                        if (ws.readyState === ws.OPEN) {
+                          ws.close(1000, 'Client requested stop');
+                        }
+                      }, 2500); // 2.5-second delay
+                      return; // Stop further processing for this message
+                    }
+        
+                    const config = parsedMessage;
+        
+                    if (recognizeStream) {
+                      recognizeStream.end();
+                    }  
                       const requestConfig = {
                         encoding: 'WEBM_OPUS',
                         sampleRateHertz: config.sampleRate,
