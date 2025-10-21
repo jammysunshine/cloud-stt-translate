@@ -45,7 +45,15 @@ export default function HomePage() {
         }
       } else {
         setInterimTranscription(data.transcription); // Update interim
-      }
+        // Update detected languages for interim results as well
+        if (data.language) {
+          setDetectedLanguages(prev => {
+            if (!prev.includes(data.language)) {
+              return [...prev, data.language];
+            }
+            return prev;
+          });
+        }
     } else if (data.error) {
       console.error('WebSocket error from server:', data.error);
       alert(`Server Error: ${data.error}`);
