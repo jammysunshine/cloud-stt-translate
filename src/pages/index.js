@@ -1,7 +1,7 @@
 
 // src/pages/index.js
 
-import { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import clientLogger from '../utils/logger.js'; // Import the client logger
 import { SESSION_LIMIT_SECONDS, PING_INTERVAL_MS, MAX_HISTORY_SIZE, DEFAULT_WEBSOCKET_PORT, MEDIA_RECORDER_MIME_TYPE, CLIENT_STOP_TIMEOUT_MS } from '../config/appConfig.js';
 import { useToast } from '../components/Toast'; // Import useToast
@@ -29,9 +29,6 @@ export default function HomePage() {
 
   const { addToast } = useToast(); // Initialize useToast
 
-  // Use constants from appConfig.js
-  // const MAX_HISTORY_SIZE = 20; // Keep history of last 20 latency values
-
   const calculateAverage = (historyRef) => {
     if (historyRef.current.length === 0) return null;
     const sum = historyRef.current.reduce((acc, val) => acc + val, 0);
@@ -45,10 +42,6 @@ export default function HomePage() {
   const isStoppingRef = useRef(false); // Flag to prevent sending audio after stopRecording
   const sessionTimeoutRef = useRef(null); // Ref to store session timeout ID
   const pingIntervalRef = useRef(null); // Ref to store ping interval ID
-
-  // Use constants from appConfig.js
-  // const SESSION_LIMIT_SECONDS = 30; // Maximum session duration in seconds
-  // const PING_INTERVAL_MS = 10000; // Send ping every 10 seconds to keep WebSocket alive
 
   const stopRecordingSession = () => {
     clientLogger.log('Stopping recording session...');
@@ -157,7 +150,6 @@ export default function HomePage() {
         }
       } else if (data.error) {
         addToast(`WebSocket error from server: ${data.error}`, 'error');
-        addToast(`Server Error: ${data.error}`, 'error');
       }
     };
 
@@ -198,7 +190,7 @@ export default function HomePage() {
 
         // Initialize WebSocket connection to the dedicated WebSocket server
         // Use NEXT_PUBLIC_WEBSOCKET_URL environment variable for deployment
-        const websocketUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:3001`;
+        const websocketUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:${DEFAULT_WEBSOCKET_PORT}`;
         clientLogger.log(`Connecting to WebSocket at: ${websocketUrl}`);
         const ws = new WebSocket(websocketUrl);
         wsRef.current = ws;
@@ -223,7 +215,7 @@ export default function HomePage() {
           const data = JSON.parse(event.data);
           if (data.type === 'config_ack') {
             clientLogger.log('Received config_ack. Starting MediaRecorder.');
-            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            const mediaRecorder = new MediaRecorder(stream, { mimeType: MEDIA_RECORDER_MIME_TYPE });
             mediaRecorderRef.current = mediaRecorder;
 
             mediaRecorder.ondataavailable = (event) => {
@@ -233,7 +225,6 @@ export default function HomePage() {
                     ws.send(event.data);
                   } catch (error) {
                     addToast(`Client-side error sending audio data: ${error.message}`, 'error');
-                    addToast(`Client Error: ${error.message}`, 'error');
                     ws.close(4000, 'Client-side audio send error');
                   }
                 }
@@ -255,7 +246,6 @@ export default function HomePage() {
               processWebSocketMessage(data);
             } catch (error) {
               addToast(`Client-side error processing WebSocket message: ${error.message}`, 'error');
-              addToast(`Client Error: ${error.message}`, 'error');
               ws.close(4000, 'Client-side processing error');
             }
           }
@@ -280,27 +270,29 @@ export default function HomePage() {
 
         ws.onerror = (error) => {
           addToast(`WebSocket error: ${error.message}`, 'error');
-          // Clear ping interval on error
-          if (pingIntervalRef.current) {
-            clearInterval(pingIntervalRef.current);
-            pingIntervalRef.current = null;
-          }
-          addToast('WebSocket connection error.', 'error');
         };
 
-        // Stop and release microphone if the user closes the tab
-        window.addEventListener('beforeunload', () => {
-          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            mediaRecorderRef.current.stop();
-          }
-          if (wsRef.current) {
-            wsRef.current.close();
-          }
-        });
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []); // Empty dependency array means this effect runs once on mount and cleans up on unmount
+
 
       } catch (error) {
         addToast(`Error accessing microphone or setting up WebSocket: ${error.message}`, 'error');
-        addToast('Could not access microphone or establish connection. Please check permissions and server.', 'error');
       }
     }
   };
