@@ -1,7 +1,7 @@
 
 // src/pages/index.js
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import clientLogger from '../utils/logger.js'; // Import the client logger
 import { SESSION_LIMIT_SECONDS, PING_INTERVAL_MS, MAX_HISTORY_SIZE, DEFAULT_WEBSOCKET_PORT, MEDIA_RECORDER_MIME_TYPE, CLIENT_STOP_TIMEOUT_MS } from '../config/appConfig.js';
 import { useToast } from '../components/Toast'; // Import useToast

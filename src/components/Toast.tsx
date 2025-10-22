@@ -16,7 +16,7 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [mounted, setMounted] = useState(false); // New state to track mount status
+  const [mounted, setMounted] = useState(false); // Track if component is mounted on client
 
   useEffect(() => {
     setMounted(true); // Set mounted to true once component mounts on client
@@ -31,17 +31,20 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setToasts((prevToasts) => prevToasts.filter((toast) => toast.id !== id));
   }, []);
 
+  // Only render the toast container on the client-side
+  const toastContainer = mounted ? createPortal(
+    <div className="toast-container">
+      {toasts.map((toast) => (
+        <Toast key={toast.id} {...toast} onDismiss={() => removeToast(toast.id)} />
+      ))}
+    </div>,
+    document.body
+  ) : null;
+
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
-      {mounted && createPortal( // Conditionally render createPortal
-        <div className="toast-container">
-          {toasts.map((toast) => (
-            <Toast key={toast.id} {...toast} onDismiss={() => removeToast(toast.id)} />
-          ))}
-        </div>,
-        document.body
-      )}
+      {toastContainer}
     </ToastContext.Provider>
   );
 };
