@@ -10,8 +10,24 @@ export const MEDIA_RECORDER_MIME_TYPE = 'audio/webm';
 export const STT_ENCODING = 'WEBM_OPUS';
 export const STT_MODEL = 'default';
 export const STT_ENABLE_AUTOMATIC_PUNCTUATION = true;
-export const STT_LANGUAGE_CODE = 'hi-IN';
-export const STT_LANGUAGE_CODES = ['hi-IN', 'en-US', 'es-ES'];
+export const STT_LANGUAGE_CODE = 'en-US'; // Default fallback language
+export const STT_LANGUAGE_CODES = [
+  'en-US', // English (United States)
+  'ar-AE', // Arabic (United Arab Emirates) - primary language in Dubai
+  'hi-IN', // Hindi (India) - common in Dubai expat community
+  'es-ES', // Spanish (Spain)
+  'fr-FR', // French (France)
+  'de-DE', // German (Germany)
+  'ja-JP', // Japanese (Japan)
+  'ko-KR', // Korean (South Korea)
+  'zh-CN', // Chinese (Simplified, China)
+  'bn-IN', // Bengali (India) - common in Dubai expat community
+  'te-IN', // Telugu (India) - common in Dubai expat community
+  'gu-IN', // Gujarati (India) - common in Dubai expat community
+  'ur-PK', // Urdu (Pakistan) - common in Dubai expat community
+  'ta-IN', // Tamil (India) - common in Dubai expat community
+  'it-IT'  // Italian (Italy) - common in Dubai expat community and tourism
+]; // Languages for auto-detection
 
 // Google Cloud Translation Configuration
 export const TRANSLATION_MIME_TYPE = 'text/plain';

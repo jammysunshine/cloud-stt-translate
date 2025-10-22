@@ -11,6 +11,8 @@ export default function HomePage() {
   const [transcribedText, setTranscribedText] = useState('');
   const [englishTranslation, setEnglishTranslation] = useState('');
   const [arabicTranslation, setArabicTranslation] = useState('');
+  const [hindiTranslation, setHindiTranslation] = useState('');
+  const [spanishTranslation, setSpanishTranslation] = useState('');
   const [detectedLanguages, setDetectedLanguages] = useState([]);
   const [interimTranscription, setInterimTranscription] = useState('');
   const [hasFinalTranscription, setHasFinalTranscription] = useState(false);
@@ -140,6 +142,22 @@ export default function HomePage() {
             setArabicTranslation(prev => {
               const newTranslation = prev + ' ' + data.arTranslation;
               clientLogger.log('Updating arabicTranslation to:', newTranslation);
+              return newTranslation;
+            });
+          }
+          if (data.hiTranslation) {
+            clientLogger.log('Received Hindi translation:', data.hiTranslation);
+            setHindiTranslation(prev => {
+              const newTranslation = prev + ' ' + data.hiTranslation;
+              clientLogger.log('Updating hindiTranslation to:', newTranslation);
+              return newTranslation;
+            });
+          }
+          if (data.esTranslation) {
+            clientLogger.log('Received Spanish translation:', data.esTranslation);
+            setSpanishTranslation(prev => {
+              const newTranslation = prev + ' ' + data.esTranslation;
+              clientLogger.log('Updating spanishTranslation to:', newTranslation);
               return newTranslation;
             });
           }
@@ -338,6 +356,16 @@ export default function HomePage() {
       <div style={{ marginTop: '20px' }}>
         <h2>Arabic Translation:</h2>
         <p>{arabicTranslation || '...'}</p>
+      </div>
+
+      <div style={{ marginTop: '20px' }}>
+        <h2>Hindi Translation:</h2>
+        <p>{hindiTranslation || '...'}</p>
+      </div>
+
+      <div style={{ marginTop: '20px' }}>
+        <h2>Spanish Translation:</h2>
+        <p>{spanishTranslation || '...'}</p>
       </div>
 
       <div style={{ marginTop: '20px' }}>
