@@ -111,11 +111,26 @@ wss.on('connection', (ws) => {
                       const requestConfig = {
                         encoding: STT_ENCODING,
                         sampleRateHertz: config.sampleRate,
-                        languageCode: STT_LANGUAGE_CODE, // Re-adding default language hint as it's required with languageCodes
+                        languageCode: STT_LANGUAGE_CODES[0], // Use first language as default fallback
                         enableAutomaticPunctuation: STT_ENABLE_AUTOMATIC_PUNCTUATION,
-                        model: STT_MODEL,
-                        languageCodes: STT_LANGUAGE_CODES,
-                      };  
+                        model: 'default', // Use default model for better language ID
+                        alternativeLanguageCodes: STT_LANGUAGE_CODES, // Enable alternative language detection
+                        maxAlternatives: 1, // Limit alternatives for faster processing
+                        profanityFilter: false, // Don't filter profanity
+                        enableWordTimeOffsets: false, // Disable time offsets for faster processing
+                        enableAutomaticPunctuation: true,
+                        useEnhanced: true, // Use enhanced models for better accuracy
+                        speechContexts: [{
+                          phrases: [], // Custom phrases can help with recognition
+                          boost: 0.0
+                        }]
+                      };
+                      
+                      // Allow client to specify a specific language if desired
+                      if (config.languageCode) {
+                        requestConfig.languageCode = config.languageCode;
+                        delete requestConfig.alternativeLanguageCodes; // Remove alternatives if specific language provided
+                      }  
             // The client does not send languageCode, so we remove the conditional block
             // if (config.languageCode) {
             //   requestConfig.languageCode = config.languageCode;
@@ -172,6 +187,8 @@ wss.on('connection', (ws) => {
                 const sourceBaseLang = language.split('-')[0];
                 let enTranslation = ''; // Declare and initialize here
                 let arTranslation = ''; // Declare and initialize here
+                let hiTranslation = ''; // Declare and initialize for Hindi
+                let esTranslation = ''; // Declare and initialize for Spanish
                 let translationDurationMs = null;
 
                 const translationPromises = [];
@@ -180,6 +197,12 @@ wss.on('connection', (ws) => {
                 }
                 if (sourceBaseLang !== 'ar') {
                   translationPromises.push(translateText(transcription, language, 'ar'));
+                }
+                if (sourceBaseLang !== 'hi') {
+                  translationPromises.push(translateText(transcription, language, 'hi'));
+                }
+                if (sourceBaseLang !== 'es') {
+                  translationPromises.push(translateText(transcription, language, 'es'));
                 }
 
                 try {
@@ -200,15 +223,29 @@ wss.on('connection', (ws) => {
                   } else {
                     arTranslation = transcription; // If source is Arabic, it's the translation
                   }
+                  if (sourceBaseLang !== 'hi') {
+                    hiTranslation = translations[translationIndex++].translatedText;
+                  } else {
+                    hiTranslation = transcription; // If source is Hindi, it's the translation
+                  }
+                  if (sourceBaseLang !== 'es') {
+                    esTranslation = translations[translationIndex++].translatedText;
+                  } else {
+                    esTranslation = transcription; // If source is Spanish, it's the translation
+                  }
                 } catch (translationError) {
                   logger.error('[WS Server] Error during translation:', translationError);
                   enTranslation = `Translation Error: ${translationError.message}`;
                   arTranslation = `Translation Error: ${translationError.message}`;
+                  hiTranslation = `Translation Error: ${translationError.message}`;
+                  esTranslation = `Translation Error: ${translationError.message}`;
                 }
 
                 // Add translations and actual translation latency to messageToSend for final results
                 messageToSend.enTranslation = enTranslation;
                 messageToSend.arTranslation = arTranslation;
+                messageToSend.hiTranslation = hiTranslation;
+                messageToSend.esTranslation = esTranslation;
                 messageToSend.translationDurationMs = translationDurationMs;
               }
 
