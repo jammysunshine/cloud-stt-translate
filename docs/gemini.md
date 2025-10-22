@@ -32,6 +32,14 @@ For the overall project goals and requirements, refer to `prompt.md`.
 
 **Agent Workflow Mandates:**
 
+*   **Rigorous and Comprehensive Test Approach:** For *every* significant change, the agent *must* design, implement, and execute a rigorous and comprehensive test approach. This includes, but is not limited to:
+    *   **Unit Tests:** Thoroughly testing individual functions, components, or modules in isolation.
+    *   **Integration Tests:** Verifying the correct interaction between different modules or services.
+    *   **Shell Script Tests:** Ensuring the reliability and correctness of any shell scripts or command-line utilities.
+    *   **End-to-End (E2E) Tests:** Simulating real user scenarios to validate the entire application flow.
+    *   **Performance Tests:** (Where applicable and feasible) Assessing the system's responsiveness and stability under various loads.
+    *   **Security Tests:** (Where applicable and feasible) Identifying vulnerabilities and ensuring data protection.
+    These tests *must* be meticulously maintained and kept fully up-to-date with all code changes. The agent's absolute priority is to exhaustively perform *all possible automated and manual testing* within its capabilities, including build, linting, and type-checking, *before* presenting changes for user review, requesting user testing, or initiating any commit or push operations to the GitHub repository. This ensures the highest quality and stability of the codebase at every stage.
 *   **Self-Review Before Testing:** Always perform a thorough self-review of all implemented changes, including code, configuration, and documentation, to ensure correctness, completeness, and adherence to project standards *before* asking the user to test.
 *   **Prioritized Agent Testing:** The agent must always test as much as possible (e.g., running automated tests, build commands, linting, type-checking) before asking the user to test or commit/push to GitHub.
 *   **Branching Strategy:** All optimizations and significant changes must always be done on a separate branch and never directly on the main branch.
